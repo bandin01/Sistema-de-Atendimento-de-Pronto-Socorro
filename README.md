@@ -2,7 +2,7 @@
 
 Projeto Integrador acadêmico (Sistemas de Informação): back-end de um sistema de gestão de atendimento hospitalar, cobrindo o fluxo completo de um pronto-socorro — recepção, triagem, atendimento médico e alta.
 
-> **Status:** em desenvolvimento. A modelagem do banco de dados está definida; as camadas de API (rotas, controllers, services, repositories) ainda estão em construção.
+> **Status:** em desenvolvimento. Banco modelado; API com autenticação, recepção (abertura, consulta, alteração e cancelamento de atendimento), cadastro de médicos e enfermagem, triagem e painel médico. O front-end fica em repositório separado.
 
 ## O problema que resolve
 
@@ -64,12 +64,69 @@ mysql -u root -p pronto_socorro < src/db/012_historico_status.sql
 
 Os arquivos em `src/db/legado/` são do modelo antigo e **não devem ser executados**.
 
-A API Node.js (rotas/controllers/services) ainda será adicionada nas próximas etapas do projeto.
+### Subir a API
+
+Pré-requisito extra: Node.js 18+.
+
+```bash
+npm install
+cp .env.example .env        # preencha DB_USER, DB_PASSWORD e JWT_SECRET (mínimo 32 caracteres)
+npm run seed:demo           # profissionais de desenvolvimento + 5 pacientes na fila de triagem
+npm start                   # http://localhost:3000/api
+```
+
+O seed é **só para desenvolvimento**. Senha de todos: `Plantao2026`.
+
+| Login | Perfil | Observação |
+|---|---|---|
+| `recepcao` | Recepção | Cadastra profissionais |
+| `dra.helena` | Médico | Clínica Médica |
+| `dr.rafael` | Médico | Ortopedia |
+| `enf.marina` | Enfermagem | Categoria ENFERMEIRO, pode triar |
+| `tec.joao` | Enfermagem | Categoria TECNICO_ENFERMAGEM, **não** pode triar |
+
+### Endpoints
+
+Prefixo `/api`. Todas exigem `Authorization: Bearer <token>`, exceto o login.
+
+| Método | Rota | Permissão | Perfis |
+|---|---|---|---|
+| POST | `/auth/login` | pública | todos |
+| GET | `/auth/sessao` | autenticado | todos |
+| POST | `/atendimentos` | `ATENDIMENTO_ABRIR` | recepção |
+| GET | `/atendimentos/:numero` | `ATENDIMENTO_CONSULTAR` | recepção, enfermagem, médico (documentos mascarados por perfil) |
+| PATCH | `/atendimentos/:numero/paciente` | `PACIENTE_ALTERAR` | recepção, só antes da confirmação médica |
+| PATCH | `/atendimentos/:numero/cancelar` | `ATENDIMENTO_CANCELAR` | recepção, só antes da confirmação médica |
+| GET | `/medicos` | `MEDICO_LISTAR` | recepção, enfermagem, médico |
+| POST | `/medicos` | `PROFISSIONAL_CADASTRAR` | recepção |
+| GET | `/medicos/me` | `MEDICO_PROPRIO_PERFIL` | médico |
+| PATCH | `/medicos/me/disponibilidade` | `MEDICO_PROPRIO_PERFIL` | médico |
+| GET | `/medicos/:id` | `MEDICO_DETALHAR` | recepção, médico |
+| PATCH | `/medicos/:id/situacao` | `PROFISSIONAL_GERENCIAR` | recepção |
+| GET, POST, PATCH | `/enfermeiros/...` | equivalentes `ENFERMEIRO_*` | mesma estrutura de `/medicos` |
+| GET | `/triagens/fila` | `TRIAGEM_VER_FILA` | enfermagem |
+| POST | `/triagens` | `TRIAGEM_REGISTRAR` | enfermagem (categoria ENFERMEIRO, disponível) |
+| GET | `/painel-medico` | `PAINEL_MEDICO_VER` | médico |
+| POST | `/painel-medico/chamar-proximo` | `ATENDIMENTO_CHAMAR_PROXIMO` | médico |
+| POST | `/painel-medico/atendimentos/:id/prescricoes` | `PRESCRICAO_REGISTRAR` | médico responsável |
+| PATCH | `/painel-medico/atendimentos/:id/finalizar` | `ATENDIMENTO_FINALIZAR` | médico responsável |
+
+Toda falha responde `{ "erro": { "codigo", "mensagem", "detalhes"? } }`: 400 `VALIDACAO` (com todos os campos inválidos em `detalhes`), 401 `NAO_AUTENTICADO`, 403 `ACESSO_NEGADO`, 404 `NAO_ENCONTRADO`/`ROTA_NAO_ENCONTRADA`, 409 `CONFLITO`, 422 `REGRA_DE_NEGOCIO` (inclui as mensagens dos triggers). A API nunca devolve SQL nem stack trace.
+
+### Testes
+
+Com a API no ar e o banco recém-recriado + `npm run seed:demo`:
+
+```bash
+npm run test:smoke     # recepção, RBAC, máscaras, validação, ordem Manchester, regras, histórico, concorrência
+npm run test:stress    # dois médicos esvaziando a fila ao mesmo tempo
+```
 
 ## Documentação
 
 - `fontes_de_verdade_sistema/requisitos.md` — requisitos funcionais (RF01–RF15) e não funcionais (RNF01–RNF09).
 - `fontes_de_verdade_sistema/guia_desenvolvimento.md` — passo a passo de implementação, fase a fase.
+- `fontes_de_verdade_sistema/requisitos_extensao_profissionais.md` — **proposta** de RF16–RF23 e RNF10–RNF14 (profissionais, RBAC, mascaramento), pendente de revisão do grupo.
 - `docs/MER.md` e `docs/DER.md` — modelo de dados conceitual e lógico, com diagramas.
 
 ## Autor
