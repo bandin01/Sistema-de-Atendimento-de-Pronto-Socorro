@@ -1,7 +1,7 @@
 # DER — Diagrama Entidade-Relacionamento (lógico, MySQL)
 
 Tabelas, colunas, chaves e cardinalidades como estão no banco.
-Fonte: `src/db/000_REFERENCIA_schema_base_assumido.sql` + migrations `010`, `011` e `012`.
+Fonte: `src/db/001_schema_base.sql` + migrations `010`, `011` e `012`.
 O modelo conceitual está em [MER.md](MER.md). Imagem: [img/DER.svg](img/DER.svg).
 
 Recepcionistas, médicos e enfermeiros ficam em tabelas separadas, cada uma com o próprio `login` e `senha_hash`. Não existe tabela `usuarios`: o perfil de acesso é definido pela tabela onde o profissional está.

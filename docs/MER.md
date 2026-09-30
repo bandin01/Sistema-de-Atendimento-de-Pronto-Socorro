@@ -2,7 +2,7 @@
 
 Sistema de Atendimento de Pronto-Socorro. Fluxo: **recepção → triagem → médico → alta**.
 
-Fonte: `src/db/000_REFERENCIA_schema_base_assumido.sql` + migrations `010`, `011` e `012`.
+Fonte: `src/db/001_schema_base.sql` + migrations `010`, `011` e `012`.
 O modelo lógico (tabelas, colunas, chaves) está em [DER.md](DER.md). Imagens: [img/MER.svg](img/MER.svg), [img/ciclo_atendimento.svg](img/ciclo_atendimento.svg).
 
 ## Diagrama (notação de Chen)

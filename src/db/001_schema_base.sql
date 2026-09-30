@@ -1,15 +1,11 @@
 -- =============================================================================
--- 000_REFERENCIA_schema_base_assumido.sql
+-- 001_schema_base.sql
 -- -----------------------------------------------------------------------------
--- ⚠️  NÃO EXECUTAR se o schema base (pacientes/atendimentos/triagens/prescricoes)
---     já existe no projeto.
+-- Schema base do fluxo de atendimento: pacientes, atendimentos (com o número
+-- AT000), triagens e prescrições. As migrations 010, 011 e 012 completam o
+-- modelo (profissionais, vínculos e histórico). Ordem: 001 → 010 → 011 → 012.
 --
--- Este arquivo documenta O QUE FOI ASSUMIDO sobre as tabelas já existentes para
--- escrever as migrations 010 e 011. Se os nomes de tabelas, colunas ou valores
--- de status forem diferentes no seu banco, ajuste as migrations 010/011 e os
--- repositories (veja a tabela de mapeamento no README_INTEGRACAO.md).
---
--- Também serve para subir um banco limpo de desenvolvimento/testes.
+-- Para recriar o banco inteiro de uma vez: src/db/recriar_banco.sh
 -- Requer MySQL 8.0.16+ (CHECK constraints são aplicadas a partir dessa versão).
 -- =============================================================================
 

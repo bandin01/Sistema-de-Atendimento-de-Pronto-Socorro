@@ -1,12 +1,9 @@
 -- =============================================================================
 -- 012_historico_status.sql
 -- =============================================================================
--- Consolida a tabela de histórico existente no schema legado (db/schema.sql)
--- com o modelo atual usado pela API.
---
--- O banco da aplicação usa nomes plurais e os status definidos em
--- config/dominio.js. A tabela é criada depois de 010 e 011 porque depende de
--- recepcionistas, medicos, enfermeiros e atendimentos.
+-- Histórico de mudanças de status do atendimento (RF14). Os valores de status
+-- são os mesmos de atendimentos.status (001). A tabela é criada depois de 010
+-- e 011 porque depende de recepcionistas, medicos, enfermeiros e atendimentos.
 --
 -- Quem alterou o status (RF14): como cada perfil tem a sua própria tabela, há
 -- uma FK por tabela de profissional. O CHECK exige exatamente uma preenchida.
