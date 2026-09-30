@@ -62,7 +62,7 @@ O `login` é único dentro de cada entidade e também entre as três (não exist
 
 | Entidade | Atributos |
 |---|---|
-| **Paciente** | <u>id</u>, nome, cpf *(s, único)*, rg *(s)*, data_nascimento, criado_em |
+| **Paciente** | <u>id</u>, nome, endereco, cpf *(s, único, opc)*, rg *(s, opc)*, nome_pai *(opc)*, nome_mae *(opc)*, data_nascimento, criado_em |
 | **Atendimento** | <u>id</u>, numero_atendimento (AT000, único), status {AGUARDANDO_TRIAGEM, AGUARDANDO_MEDICO, EM_ATENDIMENTO_MEDICO, FINALIZADO, CANCELADO}, confirmado_medico_em, finalizado_em, criado_em, atualizado_em |
 | **Triagem** | <u>id</u>, classificacao_manchester {VERMELHO, LARANJA, AMARELO, VERDE, AZUL}, queixa_principal, pressão (sistólica/diastólica), frequencia_cardiaca, frequencia_respiratoria, temperatura, saturacao_o2, glicemia, escala_dor, observacoes, realizada_em |
 | **Prescrição** | <u>id</u>, medicamento, dosagem, via_administracao, frequencia, observacoes *(opc)*, criado_em |

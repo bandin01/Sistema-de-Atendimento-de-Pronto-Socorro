@@ -9,11 +9,17 @@
 -- Requer MySQL 8.0.16+ (CHECK constraints são aplicadas a partir dessa versão).
 -- =============================================================================
 
+-- RF01: nome completo, endereço, RG, CPF, nome do pai, nome da mãe e nascimento.
+-- CPF/RG ficam NULL porque o PS atende quem chega sem documento; nome do pai
+-- pode ser desconhecido, e a mãe também (ex.: paciente em situação de rua).
 CREATE TABLE IF NOT EXISTS pacientes (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome             VARCHAR(150) NOT NULL,
+  endereco         VARCHAR(255) NOT NULL,
   cpf              CHAR(11)     NULL,
   rg               VARCHAR(20)  NULL,
+  nome_pai         VARCHAR(150) NULL,
+  nome_mae         VARCHAR(150) NULL,
   data_nascimento  DATE         NOT NULL,
   criado_em        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

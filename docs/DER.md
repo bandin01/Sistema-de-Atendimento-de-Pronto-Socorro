@@ -81,8 +81,11 @@ erDiagram
   pacientes {
     int_unsigned id PK
     varchar(150) nome
+    varchar(255) endereco
     char(11) cpf UK "NULL, sensível"
     varchar(20) rg "NULL, sensível"
+    varchar(150) nome_pai "NULL"
+    varchar(150) nome_mae "NULL"
     date data_nascimento
     datetime criado_em
   }
