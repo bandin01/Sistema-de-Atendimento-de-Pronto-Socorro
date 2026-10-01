@@ -40,9 +40,22 @@ Regra de dependência: `routes → controllers → services → repositories`.
 
 Pré-requisitos: [MySQL](https://dev.mysql.com/downloads/) 8.0.16+ instalado.
 
-### Criar ou atualizar o banco (recomendado)
+### Migrations (recomendado)
 
-O script abaixo **apaga** o banco `pronto_socorro` e o recria do zero com a versão atual do modelo. Pede confirmação e a senha do MySQL uma vez.
+Configure `DB_HOST`, `DB_PORT`, `DB_USER` e `DB_PASSWORD` no `.env` (use `127.0.0.1`, não `localhost`, no macOS) e rode:
+
+```bash
+npm run migrate            # cria o banco se faltar e aplica só as migrations pendentes
+npm run migrate:status     # lista aplicadas e pendentes
+```
+
+O runner (`src/db/migrar.js`) aplica `src/db/NNN_*.sql` em ordem e registra cada uma na tabela `schema_migrations`. **Não apaga dados.** Para mudar o schema, crie um novo arquivo (ex.: `013_descricao.sql`) — nunca edite uma migration já aplicada (o runner detecta pelo checksum e recusa).
+
+Banco criado antes do runner (pelo `recriar_banco.sh` antigo ou à mão)? Rode uma vez `npm run migrate:baseline` para marcar 001–012 como aplicadas sem reexecutá-las.
+
+### Recriar o banco do zero
+
+O script abaixo **apaga** o banco `pronto_socorro` e o recria do zero com a versão atual do modelo (apaga com o cliente `mysql`, pedindo a senha, e depois roda `npm run migrate`). Pede confirmação.
 
 ```bash
 ./src/db/recriar_banco.sh

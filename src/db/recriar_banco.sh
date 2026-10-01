@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# Recria o banco pronto_socorro do zero, aplicando os scripts na ordem:
-#   001_schema_base → 010 → 011 → 012
+# Recria o banco pronto_socorro do zero: apaga com o cliente mysql e depois
+# aplica todas as migrations com `node src/db/migrar.js` (lê o .env).
 #
 # ⚠️ APAGA todos os dados do banco. Use só em desenvolvimento.
 #
@@ -15,13 +15,6 @@ set -euo pipefail
 DB_NAME="pronto_socorro"
 MYSQL_USER="${MYSQL_USER:-root}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
-
-SCRIPTS=(
-  001_schema_base.sql
-  010_recepcionistas_medicos_enfermeiros.sql
-  011_integracao_atendimento_triagem_prescricao.sql
-  012_historico_status.sql
-)
 
 # Instalador oficial do MySQL no macOS não coloca o cliente no PATH.
 if [[ -z "${MYSQL_BIN:-}" ]]; then
@@ -38,12 +31,9 @@ fi
 read -r -p "Isso vai APAGAR o banco '$DB_NAME' e recriá-lo. Continuar? [s/N] " resposta
 [[ "$resposta" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
 
-{
-  echo "DROP DATABASE IF EXISTS $DB_NAME;"
-  echo "CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
-  echo "USE $DB_NAME;"
-  for f in "${SCRIPTS[@]}"; do cat "$DIR/$f"; echo; done
-  echo "SHOW TABLES;"
-} | "$MYSQL_BIN" -u "$MYSQL_USER" -p
+echo "DROP DATABASE IF EXISTS $DB_NAME;" | "$MYSQL_BIN" -u "$MYSQL_USER" -p
+
+# Cria o banco e aplica 001, 010, 011, 012… registrando em schema_migrations.
+node "$DIR/migrar.js"
 
 echo "Banco '$DB_NAME' recriado."

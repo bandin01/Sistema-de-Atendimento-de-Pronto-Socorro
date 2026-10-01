@@ -9,7 +9,11 @@
     "seed": "node src/db/seeds/seedDesenvolvimento.js",
     "seed:demo": "node src/db/seeds/seedDesenvolvimento.js --demo",
     "test:smoke": "node testes/smoke_api.mjs",
-    "test:stress": "node testes/stress_concorrencia.mjs"
+    "test:stress": "node testes/stress_concorrencia.mjs",
+    "migrate": "node src/db/migrar.js",
+    "migrate:status": "node src/db/migrar.js --status",
+    "migrate:baseline": "node src/db/migrar.js --baseline",
+    "test:migracoes": "node --test testes/migracoes.test.mjs"
   },
   "engines": {
     "node": ">=18"
