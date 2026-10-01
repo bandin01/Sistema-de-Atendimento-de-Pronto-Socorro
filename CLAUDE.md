@@ -47,4 +47,16 @@ Seguir **SOLID**. Use o skill `/solid-review` para revisar código novo contra o
 
 ## Fluxo de trabalho
 
+Claude quando for para desenvolvimento de nova feature ou correcao de bug sempre siga o seguinte passo a passo:
+  1. Primeiro se tiver qualquer duvida ou coisa pergunte para o proprio usuario
+  2. Explore as opcoes para desenvolver oque foi solicitado
+  3. Elabore os testes para implementar e validar a feature
+  4. Divida atividade em tasks
+  5. Elabore o plano de implementacao completo para a feature
+  6. comece a desenvolver e siga o plano elaborado
+  7. valide oque foi feito a partir dos testes elaborado
+  8. Atualizar documentacao do projeto
+  9. Escrever um arquivo chamado changes.md no qual constata todas as alteracoes (diff da branch) do repositorio
+  10. Fazer commit push
+
 Seguir a ordem das fases do `guia_desenvolvimento.md`: modelagem do banco → API/regras de negócio → (front-end no outro repo) → segurança/controle de acesso → não funcionais → testes. Não pular etapas.
