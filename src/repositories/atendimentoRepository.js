@@ -33,6 +33,11 @@ const COLUNAS_TRIAGEM = `
          DATE_FORMAT(t.realizada_em, '%Y-%m-%dT%H:%i:%s') AS triadoEm,
          e.nome                     AS enfermeiroNome`;
 
+/**
+ * Acesso à tabela atendimentos (etapa Atendimento Inicial e status do fluxo).
+ * O médico NÃO fica no atendimento: o vínculo está em consultas (migration 013).
+ * As consultas abaixo trazem o médico/consulta por LEFT JOIN quando a tela precisa.
+ */
 function criarAtendimentoRepository(pool) {
   return {
     /** O número AT000 é gerado pelo trigger trg_atendimentos_bi_numero (RNF03). */
@@ -46,30 +51,33 @@ function criarAtendimentoRepository(pool) {
         `SELECT a.id,
                 a.numero_atendimento AS numeroAtendimento,
                 a.paciente_id        AS pacienteId,
-                a.medico_id          AS medicoId,
                 a.status,
-                DATE_FORMAT(a.confirmado_medico_em, '%Y-%m-%dT%H:%i:%s') AS confirmadoMedicoEm
+                c.id                 AS consultaId,
+                c.medico_id          AS medicoId,
+                DATE_FORMAT(c.iniciada_em, '%Y-%m-%dT%H:%i:%s') AS confirmadoMedicoEm
            FROM atendimentos a
-          WHERE a.id = ?${bloquear ? ' FOR UPDATE' : ''}`,
+           LEFT JOIN consultas c ON c.atendimento_id = a.id
+          WHERE a.id = ?${bloquear ? ' FOR UPDATE OF a' : ''}`,
         [id],
       );
       return linhas[0] || null;
     },
 
-    /** Consulta da recepção (RF03/RF11): dados do atendimento + nome do médico, se houver. */
+    /** Consulta da recepção (RF03/RF11): dados do atendimento + médico da consulta, se houver. */
     async buscarPorNumero(numeroAtendimento, conexao = pool, { bloquear = false } = {}) {
       const [linhas] = await conexao.execute(
         `SELECT a.id,
                 a.numero_atendimento AS numeroAtendimento,
                 a.paciente_id        AS pacienteId,
-                a.medico_id          AS medicoId,
+                c.medico_id          AS medicoId,
                 m.nome               AS medicoNome,
                 a.status,
-                DATE_FORMAT(a.criado_em, '%Y-%m-%dT%H:%i:%s')            AS abertoEm,
-                DATE_FORMAT(a.confirmado_medico_em, '%Y-%m-%dT%H:%i:%s') AS confirmadoMedicoEm,
-                DATE_FORMAT(a.finalizado_em, '%Y-%m-%dT%H:%i:%s')        AS finalizadoEm
+                DATE_FORMAT(a.criado_em, '%Y-%m-%dT%H:%i:%s')     AS abertoEm,
+                DATE_FORMAT(c.iniciada_em, '%Y-%m-%dT%H:%i:%s')   AS confirmadoMedicoEm,
+                DATE_FORMAT(a.finalizado_em, '%Y-%m-%dT%H:%i:%s') AS finalizadoEm
            FROM atendimentos a
-           LEFT JOIN medicos m ON m.id = a.medico_id
+           LEFT JOIN consultas c ON c.atendimento_id = a.id
+           LEFT JOIN medicos m   ON m.id = c.medico_id
           WHERE a.numero_atendimento = ?${bloquear ? ' FOR UPDATE OF a' : ''}`,
         [numeroAtendimento],
       );
@@ -117,7 +125,7 @@ function criarAtendimentoRepository(pool) {
            JOIN enfermeiros e ON e.id = t.enfermeiro_id
           WHERE a.status = ?
           ORDER BY ${ORDEM_FILA_MEDICA}`,
-        [STATUS_ATENDIMENTO.AGUARDANDO_MEDICO, ...CODIGOS_MANCHESTER],
+        [STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA, ...CODIGOS_MANCHESTER],
       );
       return linhas;
     },
@@ -131,7 +139,7 @@ function criarAtendimentoRepository(pool) {
           WHERE a.status = ?
           ORDER BY ${ORDEM_FILA_MEDICA}
           LIMIT ${LIMITE_CANDIDATOS_FILA}`,
-        [STATUS_ATENDIMENTO.AGUARDANDO_MEDICO, ...CODIGOS_MANCHESTER],
+        [STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA, ...CODIGOS_MANCHESTER],
       );
       return linhas.map((l) => l.id);
     },
@@ -139,31 +147,32 @@ function criarAtendimentoRepository(pool) {
     /**
      * UPDATE condicional atômico: só um médico "ganha" o atendimento, mesmo com
      * cliques simultâneos. O InnoDB bloqueia a linha e reavalia o WHERE; quem
-     * chegar depois recebe affectedRows = 0. Esta é a confirmação médica (RF04).
+     * chegar depois recebe affectedRows = 0. Na mesma transação o service cria
+     * a consulta (consultaRepository.criar), que registra a confirmação médica.
      */
-    async vincularMedico(atendimentoId, medicoId, conexao = pool) {
+    async iniciarConsulta(atendimentoId, conexao = pool) {
       const [resultado] = await conexao.execute(
-        `UPDATE atendimentos
-            SET medico_id = ?, status = ?, confirmado_medico_em = NOW()
-          WHERE id = ? AND status = ? AND medico_id IS NULL`,
-        [medicoId, STATUS_ATENDIMENTO.EM_ATENDIMENTO_MEDICO, atendimentoId, STATUS_ATENDIMENTO.AGUARDANDO_MEDICO],
+        'UPDATE atendimentos SET status = ? WHERE id = ? AND status = ?',
+        [STATUS_ATENDIMENTO.EM_CONSULTA, atendimentoId, STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA],
       );
       return resultado.affectedRows;
     },
 
-    /** Usa o índice único da coluna gerada medico_em_atendimento_id. */
+    /** Usa o índice único da coluna gerada consultas.medico_em_consulta_id (RF20). */
     async buscarEmAndamentoDoMedico(medicoId, conexao = pool) {
       const [linhas] = await conexao.execute(
         `SELECT a.id,
                 a.numero_atendimento AS numeroAtendimento,
-                DATE_FORMAT(a.confirmado_medico_em, '%Y-%m-%dT%H:%i:%s') AS confirmadoMedicoEm,
+                c.id                 AS consultaId,
+                DATE_FORMAT(c.iniciada_em, '%Y-%m-%dT%H:%i:%s') AS confirmadoMedicoEm,
                 ${COLUNAS_PACIENTE},
                 ${COLUNAS_TRIAGEM}
-           FROM atendimentos a
-           JOIN triagens t    ON t.atendimento_id = a.id
-           JOIN pacientes p   ON p.id = a.paciente_id
-           JOIN enfermeiros e ON e.id = t.enfermeiro_id
-          WHERE a.medico_em_atendimento_id = ?`,
+           FROM consultas c
+           JOIN atendimentos a ON a.id = c.atendimento_id
+           JOIN triagens t     ON t.atendimento_id = a.id
+           JOIN pacientes p    ON p.id = a.paciente_id
+           JOIN enfermeiros e  ON e.id = t.enfermeiro_id
+          WHERE c.medico_em_consulta_id = ?`,
         [medicoId],
       );
       return linhas[0] || null;
@@ -177,12 +186,13 @@ function criarAtendimentoRepository(pool) {
       return resultado.affectedRows;
     },
 
-    async finalizar(atendimentoId, medicoId, conexao = pool) {
+    /** Exige desfecho já registrado (trigger trg_atendimentos_bu_bloqueio). */
+    async finalizar(atendimentoId, conexao = pool) {
       const [resultado] = await conexao.execute(
         `UPDATE atendimentos
             SET status = ?, finalizado_em = NOW()
-          WHERE id = ? AND medico_id = ? AND status = ?`,
-        [STATUS_ATENDIMENTO.FINALIZADO, atendimentoId, medicoId, STATUS_ATENDIMENTO.EM_ATENDIMENTO_MEDICO],
+          WHERE id = ? AND status = ?`,
+        [STATUS_ATENDIMENTO.FINALIZADO, atendimentoId, STATUS_ATENDIMENTO.EM_CONSULTA],
       );
       return resultado.affectedRows;
     },

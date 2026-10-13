@@ -49,11 +49,13 @@ describe('dividirInstrucoes', () => {
 
   test('arquivos reais: triggers e procedure inteiros', () => {
     const porVersao = Object.fromEntries(listarMigrations().map((m) => [m.versao, dividirInstrucoes(m.sql)]));
-    assert.deepEqual(Object.keys(porVersao), ['001', '010', '011', '012']);
+    assert.deepEqual(Object.keys(porVersao), ['001', '010', '011', '012', '013']);
     assert.equal(contar(porVersao['001'], /^CREATE TRIGGER/), 1);
     assert.equal(contar(porVersao['010'], /^CREATE TRIGGER/), 6);
     assert.equal(contar(porVersao['010'], /^CREATE PROCEDURE/), 1);
     assert.equal(contar(porVersao['011'], /^CREATE TRIGGER/), 6);
+    assert.equal(contar(porVersao['013'], /^CREATE TRIGGER/), 9);
+    assert.equal(contar(porVersao['013'], /^CREATE TABLE/), 4);
     for (const instrucoes of Object.values(porVersao)) {
       for (const i of instrucoes) assert.doesNotMatch(i, /DELIMITER|\$\$/);
       for (const i of instrucoes.filter((x) => /^CREATE (TRIGGER|PROCEDURE)/.test(x))) assert.match(i, /END$/);
@@ -90,14 +92,92 @@ describe('migrador (integração)', { skip: !conexao }, () => {
     assert.deepEqual(aplicadas, migrations.map((m) => m.nome));
 
     const tabelas = (await consultar('SHOW TABLES')).map((l) => Object.values(l)[0]);
-    for (const t of ['pacientes', 'atendimentos', 'triagens', 'prescricoes', 'recepcionistas', 'medicos', 'enfermeiros', 'historico_status', 'schema_migrations']) {
+    for (const t of ['pacientes', 'atendimentos', 'triagens', 'consultas', 'desfechos', 'prescricoes', 'recepcionistas', 'medicos', 'enfermeiros',
+      'historico_status', 'historico_etapas', 'historico_status_medico', 'schema_migrations']) {
       assert.ok(tabelas.includes(t), `tabela ${t}`);
     }
+    // 001: 1 · 010: 6 · 011: 6 · 013: remove 3 da 011 e cria 9
     const [{ n: triggers }] = await consultar('SELECT COUNT(*) AS n FROM information_schema.triggers WHERE trigger_schema = DATABASE()');
-    assert.equal(triggers, 13);
+    assert.equal(triggers, 19);
     const [{ n: procedures }] = await consultar("SELECT COUNT(*) AS n FROM information_schema.routines WHERE routine_schema = DATABASE() AND routine_type = 'PROCEDURE'");
     assert.equal(procedures, 1);
-    assert.equal((await consultar('SELECT versao FROM schema_migrations')).length, 4);
+    assert.equal((await consultar('SELECT versao FROM schema_migrations')).length, 5);
+  });
+
+  test('013: atendimento sem dados do médico; médico com status_operacional; RG VARCHAR(9)', async () => {
+    const colunas = async (tabela) => (await consultar(
+      'SELECT column_name AS c, column_type AS t, is_nullable AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?',
+      [tabela],
+    )).reduce((mapa, l) => ({ ...mapa, [l.c]: l }), {});
+
+    const atendimentos = await colunas('atendimentos');
+    for (const c of ['medico_id', 'medico_em_atendimento_id', 'confirmado_medico_em']) assert.ok(!(c in atendimentos), `atendimentos.${c} removida`);
+    assert.equal(atendimentos.status.t, "enum('AGUARDANDO_TRIAGEM','AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO')");
+
+    const medicos = await colunas('medicos');
+    assert.ok(!('status_disponibilidade' in medicos));
+    assert.equal(medicos.status_operacional.t, "enum('EM_PLANTAO','EM_CONSULTA','PAUSA','FOLGA','LICENCA')");
+    assert.equal(medicos.status_operacional.n, 'NO');
+
+    for (const t of ['pacientes', 'recepcionistas', 'medicos', 'enfermeiros']) {
+      assert.equal((await colunas(t)).rg.t, 'varchar(9)', `${t}.rg`);
+    }
+    assert.equal((await colunas('historico_etapas')).descricao.t, 'varchar(255)');
+    assert.equal((await colunas('historico_etapas')).descricao.n, 'NO');
+  });
+
+  test('013: RG com mais de 9 caracteres ou fora do formato é recusado', async () => {
+    await assert.rejects(conexao.query(
+      "INSERT INTO pacientes (nome, endereco, rg, data_nascimento) VALUES ('RG Longo', 'Rua X', '1234567890', '1990-01-01')",
+    ));
+    await assert.rejects(conexao.query(
+      "INSERT INTO pacientes (nome, endereco, rg, data_nascimento) VALUES ('RG Letras', 'Rua X', 'ABCDE', '1990-01-01')",
+    ), /chk_pacientes_rg/);
+  });
+
+  test('013: fluxo Triagem → Consulta → Desfecho garantido pelos triggers', async () => {
+    const executar = async (sql, params) => (await conexao.query(sql, params))[0];
+    const { insertId: medicoId } = await executar(
+      `INSERT INTO medicos (nome, cpf, data_nascimento, email, crm_numero, crm_uf, especialidade, login, senha_hash)
+       VALUES ('Médico Teste', '12345678062', '1980-01-01', 'medico@teste.local', '111', 'SP', 'Clínica', 'med.teste', 'x')`,
+    );
+    const { insertId: enfermeiroId } = await executar(
+      `INSERT INTO enfermeiros (nome, cpf, data_nascimento, email, coren_numero, coren_uf, login, senha_hash)
+       VALUES ('Enfermeira Teste', '34567891228', '1990-01-01', 'enf@teste.local', '222', 'SP', 'enf.teste', 'x')`,
+    );
+    const { insertId: pacienteId } = await executar(
+      "INSERT INTO pacientes (nome, endereco, data_nascimento) VALUES ('Paciente Fluxo', 'Rua Y', '1990-01-01')",
+    );
+    const { insertId: atendimentoId } = await executar('INSERT INTO atendimentos (paciente_id) VALUES (?)', [pacienteId]);
+    await assert.rejects(executar("INSERT INTO atendimentos (paciente_id, status) VALUES (?, 'EM_CONSULTA')", [pacienteId]), /começa aguardando triagem/);
+
+    // Status do médico: nasce FOLGA e cada mudança vai para o histórico
+    await executar("UPDATE medicos SET status_operacional = 'EM_PLANTAO' WHERE id = ?", [medicoId]);
+    const historicoMedico = await consultar('SELECT status_anterior AS a, status_novo AS n FROM historico_status_medico WHERE medico_id = ? ORDER BY id', [medicoId]);
+    assert.deepEqual(historicoMedico.map((h) => `${h.a}>${h.n}`), ['null>FOLGA', 'FOLGA>EM_PLANTAO']);
+
+    await executar(
+      "INSERT INTO triagens (atendimento_id, enfermeiro_id, classificacao_manchester, queixa_principal) VALUES (?, ?, 'VERMELHO', 'Dor torácica')",
+      [atendimentoId, enfermeiroId],
+    );
+    await executar("UPDATE atendimentos SET status = 'AGUARDANDO_CONSULTA' WHERE id = ?", [atendimentoId]);
+
+    await assert.rejects(executar('INSERT INTO consultas (atendimento_id, medico_id) VALUES (?, ?)', [atendimentoId, medicoId]), /EM_CONSULTA/);
+    await executar("UPDATE atendimentos SET status = 'EM_CONSULTA' WHERE id = ?", [atendimentoId]);
+    const { insertId: consultaId } = await executar('INSERT INTO consultas (atendimento_id, medico_id) VALUES (?, ?)', [atendimentoId, medicoId]);
+
+    await assert.rejects(executar("UPDATE atendimentos SET status = 'CANCELADO' WHERE id = ?", [atendimentoId]), /não pode ser cancelado/);
+    await assert.rejects(executar("UPDATE atendimentos SET status = 'FINALIZADO', finalizado_em = NOW() WHERE id = ?", [atendimentoId]), /desfecho/);
+    await assert.rejects(executar('UPDATE consultas SET finalizada_em = NOW() WHERE id = ?', [consultaId]), /desfecho/);
+    await assert.rejects(executar("INSERT INTO desfechos (consulta_id, tipo, descricao) VALUES (?, 'PRESCRICAO', 'Receita')", [consultaId]), /prescrição/);
+    await assert.rejects(executar("INSERT INTO desfechos (consulta_id, tipo, descricao) VALUES (?, 'ENCAMINHAMENTO', 'Ortopedia')", [consultaId]), /chk_desfechos_destino/);
+
+    await executar("INSERT INTO desfechos (consulta_id, tipo, descricao) VALUES (?, 'ALTA', 'Alta com orientações')", [consultaId]);
+    await executar('UPDATE consultas SET finalizada_em = NOW() WHERE id = ?', [consultaId]);
+    await executar("UPDATE atendimentos SET status = 'FINALIZADO', finalizado_em = NOW() WHERE id = ?", [atendimentoId]);
+
+    await assert.rejects(executar("UPDATE desfechos SET descricao = 'Outra' WHERE consulta_id = ?", [consultaId]), /não pode ser alterado/);
+    await assert.rejects(executar("UPDATE atendimentos SET status = 'CANCELADO' WHERE id = ?", [atendimentoId]), /finalizado/);
   });
 
   test('segunda execução não aplica nada', async () => {
@@ -110,7 +190,7 @@ describe('migrador (integração)', { skip: !conexao }, () => {
       "INSERT INTO pacientes (nome, endereco, data_nascimento) VALUES ('Teste Migração', 'Rua X', '1990-01-01')",
     ))[0];
     await conexao.query('INSERT INTO atendimentos (paciente_id) VALUES (?)', [insertId]);
-    const [{ numero_atendimento: numero }] = await consultar('SELECT numero_atendimento FROM atendimentos');
+    const [{ numero_atendimento: numero }] = await consultar('SELECT numero_atendimento FROM atendimentos WHERE paciente_id = ?', [insertId]);
     assert.match(numero, /^AT\d{3,}$/);
   });
 
@@ -122,7 +202,7 @@ describe('migrador (integração)', { skip: !conexao }, () => {
   test('baseline: banco com schema e sem registros → marca todas', async () => {
     await conexao.query('DROP TABLE schema_migrations');
     const { marcadas } = await criarMigrador({ conexao, migrations }).baseline();
-    assert.equal(marcadas.length, 4);
+    assert.equal(marcadas.length, 5);
     await assert.rejects(criarMigrador({ conexao, migrations }).baseline(), /já tem registros/);
   });
 

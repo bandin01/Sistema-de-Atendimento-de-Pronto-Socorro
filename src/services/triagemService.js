@@ -1,6 +1,8 @@
 'use strict';
 
-const { STATUS_ATENDIMENTO, STATUS_ENFERMEIRO, CATEGORIA_ENFERMAGEM } = require('../config/dominio');
+const {
+  STATUS_ATENDIMENTO, ETAPA_ATENDIMENTO, STATUS_ENFERMEIRO, CATEGORIA_ENFERMAGEM,
+} = require('../config/dominio');
 const { CODIGOS_MANCHESTER, buscarClassificacao } = require('../config/manchester');
 const { PERFIS } = require('../config/perfis');
 const {
@@ -14,7 +16,8 @@ const { montarPaciente } = require('./apresentacaoClinica');
  * ENFERMEIRO (Resolução Cofen nº 661/2021), sempre sobre um atendimento válido.
  */
 function criarTriagemService({
-  atendimentoRepository, triagemRepository, enfermeiroRepository, historicoStatusRepository, transacao,
+  atendimentoRepository, triagemRepository, enfermeiroRepository, historicoStatusRepository,
+  historicoEtapasRepository, transacao,
 }) {
   function validarTriagem(dados) {
     const d = dados && typeof dados === 'object' ? dados : {};
@@ -105,7 +108,7 @@ function criarTriagemService({
         const atualizados = await atendimentoRepository.atualizarStatus(
           atendimentoId,
           STATUS_ATENDIMENTO.AGUARDANDO_TRIAGEM,
-          STATUS_ATENDIMENTO.AGUARDANDO_MEDICO,
+          STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA,
           conexao,
         );
         if (atualizados !== 1) throw new ErroConflito('O atendimento mudou durante o registro. Recarregue a fila.');
@@ -113,15 +116,22 @@ function criarTriagemService({
         await historicoStatusRepository.registrar({
           atendimentoId,
           statusAnterior: STATUS_ATENDIMENTO.AGUARDANDO_TRIAGEM,
-          statusNovo: STATUS_ATENDIMENTO.AGUARDANDO_MEDICO,
+          statusNovo: STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA,
           responsavel: solicitante,
+        }, conexao);
+
+        const { descricao: risco } = buscarClassificacao(triagem.classificacao);
+        await historicoEtapasRepository.registrar({
+          atendimentoId,
+          etapa: ETAPA_ATENDIMENTO.TRIAGEM,
+          descricao: `Triagem realizada por ${enfermeiro.nome}: classificação ${triagem.classificacao} (${risco}).`,
         }, conexao);
 
         return {
           atendimento: {
             id: atendimento.id,
             numeroAtendimento: atendimento.numeroAtendimento,
-            status: STATUS_ATENDIMENTO.AGUARDANDO_MEDICO,
+            status: STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA,
           },
           triagem: await triagemRepository.buscarPorId(triagemId, conexao),
         };

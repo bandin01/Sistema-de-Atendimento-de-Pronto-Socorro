@@ -7,6 +7,10 @@
  * depende só destes métodos — LSP/DIP):
  *   criar, buscarPorId, listar, buscarConflitos,
  *   atualizarDisponibilidade, atualizarSituacao
+ *
+ * A coluna do médico é status_operacional (migration 013); no contrato comum
+ * ela continua exposta como statusDisponibilidade. Cada mudança gera uma linha
+ * em historico_status_medico pelo trigger trg_medicos_au_status.
  */
 const SELECT_BASE = `
   SELECT m.id,
@@ -20,7 +24,7 @@ const SELECT_BASE = `
          m.crm_numero              AS crmNumero,
          m.crm_uf                  AS crmUf,
          m.especialidade,
-         m.status_disponibilidade  AS statusDisponibilidade,
+         m.status_operacional      AS statusDisponibilidade,
          m.ativo,
          DATE_FORMAT(m.criado_em, '%Y-%m-%dT%H:%i:%s') AS criadoEm
     FROM medicos m`;
@@ -59,7 +63,7 @@ function criarMedicoRepository(pool) {
       const condicoes = [];
       const parametros = [];
       if (statusDisponibilidade) {
-        condicoes.push('m.status_disponibilidade = ?');
+        condicoes.push('m.status_operacional = ?');
         parametros.push(statusDisponibilidade);
       }
       if (especialidade) {
@@ -95,12 +99,12 @@ function criarMedicoRepository(pool) {
     },
 
     async atualizarDisponibilidade(id, statusDisponibilidade, conexao = pool) {
-      await conexao.execute('UPDATE medicos SET status_disponibilidade = ? WHERE id = ?', [statusDisponibilidade, id]);
+      await conexao.execute('UPDATE medicos SET status_operacional = ? WHERE id = ?', [statusDisponibilidade, id]);
     },
 
     async atualizarSituacao(id, { ativo, statusDisponibilidade }, conexao = pool) {
       await conexao.execute(
-        'UPDATE medicos SET ativo = ?, status_disponibilidade = ? WHERE id = ?',
+        'UPDATE medicos SET ativo = ?, status_operacional = ? WHERE id = ?',
         [ativo ? 1 : 0, statusDisponibilidade, id],
       );
     },

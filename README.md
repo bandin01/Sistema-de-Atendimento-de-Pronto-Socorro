@@ -1,15 +1,18 @@
 # Sistema de Atendimento de Pronto-Socorro — Back-end
 
-Projeto Integrador acadêmico (Sistemas de Informação): back-end de um sistema de gestão de atendimento hospitalar, cobrindo o fluxo completo de um pronto-socorro — recepção, triagem, atendimento médico e alta.
+Projeto Integrador acadêmico (Sistemas de Informação): back-end de um sistema de gestão de atendimento hospitalar, cobrindo o fluxo completo de um pronto-socorro:
 
-> **Status:** em desenvolvimento. Banco modelado; API com autenticação, recepção (abertura, consulta, alteração e cancelamento de atendimento), cadastro de médicos e enfermagem, triagem e painel médico. O front-end fica em repositório separado.
+**Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho** (prescrição, exames, encaminhamento ou alta).
+
+> **Status:** em desenvolvimento. Banco modelado; API com autenticação, recepção (abertura, consulta, alteração e cancelamento de atendimento), cadastro de médicos e enfermagem, triagem, painel médico com consulta e desfecho, e históricos de status e de etapas. O front-end fica em repositório separado.
 
 ## O problema que resolve
 
 Digitaliza o fluxo de um pronto-socorro, garantindo regras de negócio críticas no back-end (não só na interface), como:
 
-- Bloqueio de alteração/cancelamento de atendimento após confirmação médica.
-- Impedimento de qualquer alteração em atendimentos já finalizados.
+- Bloqueio de alteração/cancelamento de atendimento após confirmação médica (abertura da consulta).
+- Impedimento de qualquer alteração em atendimentos já finalizados; finalização só com desfecho registrado.
+- Histórico de status do atendimento, histórico das etapas do paciente e histórico de status do médico.
 - Geração segura e sequencial do número de atendimento (`AT000`) sob concorrência.
 - Ordenação do painel médico por classificação de Manchester feita na camada de dados.
 - Controle de acesso por perfil (recepção, enfermagem, médico) validado em toda rota.
@@ -22,7 +25,7 @@ Digitaliza o fluxo de um pronto-socorro, garantindo regras de negócio críticas
 
 ## Arquitetura
 
-Camadas simples, sem DDD tático — o domínio é linear (recepção → triagem → médico → alta):
+Camadas simples, sem DDD tático — o domínio é linear (chegada → atendimento inicial → triagem → consulta → desfecho):
 
 ```
 /src
@@ -51,7 +54,9 @@ npm run migrate:status     # lista aplicadas e pendentes
 
 O runner (`src/db/migrar.js`) aplica `src/db/NNN_*.sql` em ordem e registra cada uma na tabela `schema_migrations`. **Não apaga dados.** Para mudar o schema, crie um novo arquivo (ex.: `013_descricao.sql`) — nunca edite uma migration já aplicada (o runner detecta pelo checksum e recusa).
 
-Banco criado antes do runner (pelo `recriar_banco.sh` antigo ou à mão)? Rode uma vez `npm run migrate:baseline` para marcar 001–012 como aplicadas sem reexecutá-las.
+Banco criado antes do runner (pelo `recriar_banco.sh` antigo ou à mão) com as migrations 001–012? Antes de adicionar a 013, rode uma vez `npm run migrate:baseline` para marcar 001–012 como aplicadas sem reexecutá-las; depois, `npm run migrate` aplica só a 013.
+
+A migration `013_fluxo_etapas_consulta_desfecho.sql` converte os dados existentes (status renomeados, consultas, desfechos e etapas preenchidos). Ela falha se algum RG tiver mais de 9 caracteres: o cabeçalho do arquivo traz a consulta para conferir antes.
 
 ### Recriar o banco do zero
 
@@ -73,6 +78,7 @@ mysql -u root -p pronto_socorro < src/db/001_schema_base.sql
 mysql -u root -p pronto_socorro < src/db/010_recepcionistas_medicos_enfermeiros.sql
 mysql -u root -p pronto_socorro < src/db/011_integracao_atendimento_triagem_prescricao.sql
 mysql -u root -p pronto_socorro < src/db/012_historico_status.sql
+mysql -u root -p pronto_socorro < src/db/013_fluxo_etapas_consulta_desfecho.sql
 ```
 
 Os arquivos em `src/db/legado/` são do modelo antigo e **não devem ser executados**.
@@ -93,8 +99,8 @@ O seed é **só para desenvolvimento**. Senha de todos: `Plantao2026`.
 | Login | Perfil | Observação |
 |---|---|---|
 | `recepcao` | Recepção | Cadastra profissionais |
-| `dra.helena` | Médico | Clínica Médica |
-| `dr.rafael` | Médico | Ortopedia |
+| `dra.helena` | Médico | Clínica Médica (nasce de `FOLGA`; mude para `EM_PLANTAO` para chamar pacientes) |
+| `dr.rafael` | Médico | Ortopedia (idem) |
 | `enf.marina` | Enfermagem | Categoria ENFERMEIRO, pode triar |
 | `tec.joao` | Enfermagem | Categoria TECNICO_ENFERMAGEM, **não** pode triar |
 
@@ -113,16 +119,18 @@ Prefixo `/api`. Todas exigem `Authorization: Bearer <token>`, exceto o login.
 | GET | `/medicos` | `MEDICO_LISTAR` | recepção, enfermagem, médico |
 | POST | `/medicos` | `PROFISSIONAL_CADASTRAR` | recepção |
 | GET | `/medicos/me` | `MEDICO_PROPRIO_PERFIL` | médico |
-| PATCH | `/medicos/me/disponibilidade` | `MEDICO_PROPRIO_PERFIL` | médico |
+| PATCH | `/medicos/me/disponibilidade` | `MEDICO_PROPRIO_PERFIL` | médico; corpo `{ statusDisponibilidade }` com o status operacional `EM_PLANTAO`, `PAUSA`, `FOLGA` ou `LICENCA` |
 | GET | `/medicos/:id` | `MEDICO_DETALHAR` | recepção, médico |
 | PATCH | `/medicos/:id/situacao` | `PROFISSIONAL_GERENCIAR` | recepção |
 | GET, POST, PATCH | `/enfermeiros/...` | equivalentes `ENFERMEIRO_*` | mesma estrutura de `/medicos` |
 | GET | `/triagens/fila` | `TRIAGEM_VER_FILA` | enfermagem |
 | POST | `/triagens` | `TRIAGEM_REGISTRAR` | enfermagem (categoria ENFERMEIRO, disponível) |
 | GET | `/painel-medico` | `PAINEL_MEDICO_VER` | médico |
-| POST | `/painel-medico/chamar-proximo` | `ATENDIMENTO_CHAMAR_PROXIMO` | médico |
-| POST | `/painel-medico/atendimentos/:id/prescricoes` | `PRESCRICAO_REGISTRAR` | médico responsável |
-| PATCH | `/painel-medico/atendimentos/:id/finalizar` | `ATENDIMENTO_FINALIZAR` | médico responsável |
+| POST | `/painel-medico/chamar-proximo` | `ATENDIMENTO_CHAMAR_PROXIMO` | médico `EM_PLANTAO` (abre a consulta) |
+| POST | `/painel-medico/atendimentos/:id/prescricoes` | `PRESCRICAO_REGISTRAR` | médico responsável pela consulta |
+| PATCH | `/painel-medico/atendimentos/:id/finalizar` | `ATENDIMENTO_FINALIZAR` | médico responsável; corpo `{ tipoDesfecho, descricao, destinoEncaminhamento? }` |
+
+`tipoDesfecho`: `PRESCRICAO` (exige prescrição registrada), `EXAMES`, `ENCAMINHAMENTO` (exige `destinoEncaminhamento`) ou `ALTA`. A consulta do atendimento devolve `historico` (status), `etapas` (linha do tempo com descrição) e, para enfermagem e médico, `desfecho`.
 
 Toda falha responde `{ "erro": { "codigo", "mensagem", "detalhes"? } }`: 400 `VALIDACAO` (com todos os campos inválidos em `detalhes`), 401 `NAO_AUTENTICADO`, 403 `ACESSO_NEGADO`, 404 `NAO_ENCONTRADO`/`ROTA_NAO_ENCONTRADA`, 409 `CONFLITO`, 422 `REGRA_DE_NEGOCIO` (inclui as mensagens dos triggers). A API nunca devolve SQL nem stack trace.
 
@@ -131,16 +139,18 @@ Toda falha responde `{ "erro": { "codigo", "mensagem", "detalhes"? } }`: 400 `VA
 Com a API no ar e o banco recém-recriado + `npm run seed:demo`:
 
 ```bash
-npm run test:smoke     # recepção, RBAC, máscaras, validação, ordem Manchester, regras, histórico, concorrência
+npm run test:smoke     # recepção, RBAC, máscaras, validação, ordem Manchester, regras, desfecho, históricos, concorrência
 npm run test:stress    # dois médicos esvaziando a fila ao mesmo tempo
+npm run test:migracoes # runner de migrations + regras da 013 no banco (banco descartável)
 ```
 
 ## Documentação
 
 - `fontes_de_verdade_sistema/requisitos.md` — requisitos funcionais (RF01–RF15) e não funcionais (RNF01–RNF09).
 - `fontes_de_verdade_sistema/guia_desenvolvimento.md` — passo a passo de implementação, fase a fase.
-- `fontes_de_verdade_sistema/requisitos_extensao_profissionais.md` — **proposta** de RF16–RF23 e RNF10–RNF14 (profissionais, RBAC, mascaramento), pendente de revisão do grupo.
+- `fontes_de_verdade_sistema/requisitos_extensao_profissionais.md` — **proposta** de RF16–RF26 e RNF10–RNF14 (profissionais, fluxo em etapas, desfecho, históricos, RBAC, mascaramento), pendente de revisão do grupo.
 - `docs/MER.md` e `docs/DER.md` — modelo de dados conceitual e lógico, com diagramas.
+- `docs/DICIONARIO_DADOS.md` — dicionário de dados (cada tabela, coluna, tipo, nulidade e regra).
 
 ## Autor
 

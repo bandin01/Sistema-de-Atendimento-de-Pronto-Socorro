@@ -2,21 +2,42 @@
 
 /**
  * Valores de domínio compartilhados. Espelham os ENUMs do banco
- * (001_schema_base e migrations 010/011). Se renomear no banco, renomeie aqui.
+ * (001_schema_base e migrations 010/011/013). Se renomear no banco, renomeie aqui.
  */
+
+/** Status do atendimento: nomeiam a ETAPA do fluxo, nunca o profissional. */
 const STATUS_ATENDIMENTO = Object.freeze({
   AGUARDANDO_TRIAGEM: 'AGUARDANDO_TRIAGEM',
-  AGUARDANDO_MEDICO: 'AGUARDANDO_MEDICO',
-  EM_ATENDIMENTO_MEDICO: 'EM_ATENDIMENTO_MEDICO',
+  AGUARDANDO_CONSULTA: 'AGUARDANDO_CONSULTA',
+  EM_CONSULTA: 'EM_CONSULTA',
   FINALIZADO: 'FINALIZADO',
   CANCELADO: 'CANCELADO',
 });
 
+/** Etapas do fluxo do paciente, em ordem cronológica (historico_etapas). */
+const ETAPA_ATENDIMENTO = Object.freeze({
+  CHEGADA: 'CHEGADA',
+  ATENDIMENTO_INICIAL: 'ATENDIMENTO_INICIAL',
+  TRIAGEM: 'TRIAGEM',
+  CONSULTA: 'CONSULTA',
+  DESFECHO: 'DESFECHO',
+});
+
+/** Desfecho da consulta (desfechos.tipo). Todos encerram o atendimento. */
+const TIPO_DESFECHO = Object.freeze({
+  PRESCRICAO: 'PRESCRICAO', // alta com receita (itens em prescricoes)
+  EXAMES: 'EXAMES', // alta com pedido de exames
+  ENCAMINHAMENTO: 'ENCAMINHAMENTO', // exige destino
+  ALTA: 'ALTA', // alta simples
+});
+
+/** Status operacional do médico (medicos.status_operacional). */
 const STATUS_MEDICO = Object.freeze({
-  DISPONIVEL: 'DISPONIVEL',
-  EM_ATENDIMENTO: 'EM_ATENDIMENTO', // controlado pelo sistema, nunca pelo usuário
+  EM_PLANTAO: 'EM_PLANTAO', // apto a chamar o próximo paciente
+  EM_CONSULTA: 'EM_CONSULTA', // controlado pelo sistema, nunca pelo usuário
   PAUSA: 'PAUSA',
-  INDISPONIVEL: 'INDISPONIVEL',
+  FOLGA: 'FOLGA',
+  LICENCA: 'LICENCA',
 });
 
 const STATUS_ENFERMEIRO = Object.freeze({
@@ -37,6 +58,8 @@ const UFS = Object.freeze([
 
 module.exports = {
   STATUS_ATENDIMENTO,
+  ETAPA_ATENDIMENTO,
+  TIPO_DESFECHO,
   STATUS_MEDICO,
   STATUS_ENFERMEIRO,
   CATEGORIA_ENFERMAGEM,

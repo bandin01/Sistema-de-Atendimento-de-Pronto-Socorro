@@ -20,12 +20,16 @@ Esta é a base de tudo. Os requisitos não funcionais RNF03 e RNF04 (unicidade d
 
 A partir dos requisitos, as entidades principais são:
 
-- **Paciente** — nome completo, endereço, RG, CPF, nome do pai, nome da mãe, data de nascimento
-- **Atendimento** — número único (formato "AT000"), status (aberto, em triagem, em atendimento médico, finalizado, cancelado), data/hora de abertura, referência ao paciente
-- **Triagem** — pressão arterial, temperatura corporal, batimentos cardíacos, queixas principais, classificação de Manchester, referência ao atendimento
-- **Prescrição/Atendimento Médico** — medicações prescritas, data da alta, referência ao atendimento
-- **Usuário/Perfil** — para controle de acesso (recepção, enfermagem, médico)
-- **Histórico de Status** — para manter o rastro de mudanças de status do atendimento (RF14)
+O atendimento é um **processo em etapas** (Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho), não um ator. As entidades se dividem em atores, etapas e rastreabilidade:
+
+- **Paciente** *(ator)* — nome completo, endereço, RG (até 9 dígitos), CPF, nome do pai, nome da mãe, data de nascimento
+- **Recepcionista, Enfermeiro, Médico** *(atores)* — cada perfil na própria tabela, com login e senha; o médico tem status operacional próprio (em plantão, em consulta, pausa, folga, licença)
+- **Atendimento** *(etapa: chegada e atendimento inicial)* — número único (formato "AT000"), status da etapa (aguardando triagem, aguardando consulta, em consulta, finalizado, cancelado), data/hora de chegada, referência ao paciente
+- **Triagem** *(etapa)* — pressão arterial, temperatura corporal, batimentos cardíacos, queixas principais, classificação de Manchester, referência ao atendimento
+- **Consulta** *(etapa)* — médico responsável, início (confirmação médica) e fim, referência ao atendimento
+- **Desfecho** *(etapa)* — prescrição, exames, encaminhamento ou alta, com descrição; finaliza o atendimento
+- **Prescrição** — medicações prescritas na consulta, referência ao atendimento
+- **Histórico de Status**, **Histórico de Etapas** e **Histórico de Status do Médico** — rastro de mudanças (RF14)
 
 ### 1.2 Desenhar o modelo entidade-relacionamento (MER)
 

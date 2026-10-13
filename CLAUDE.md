@@ -17,7 +17,7 @@ HTML/CSS/JS ficam no front-end (repo separado). Aqui: **Node.js + MySQL** (drive
 
 ## Arquitetura
 
-Camadas simples, sem DDD tático (agregados, value objects, domain events) — o domínio é linear (recepção → triagem → médico → alta) e não justifica essa complexidade:
+Camadas simples, sem DDD tático (agregados, value objects, domain events) — o domínio é linear (chegada → atendimento inicial → triagem → consulta → desfecho) e não justifica essa complexidade:
 
 ```
 /src
@@ -39,7 +39,8 @@ Seguir **SOLID**. Use o skill `/solid-review` para revisar código novo contra o
 
 - Bloquear alteração/cancelamento de atendimento após confirmação médica (RF04, RF05, RNF05).
 - Impedir qualquer alteração em atendimentos finalizados (RF15).
-- Triagem e Prescrição nunca existem sem um Atendimento válido (RNF04).
+- Triagem, Consulta, Desfecho e Prescrição nunca existem sem um Atendimento válido (RNF04).
+- Atendimento só é finalizado com desfecho registrado (RF24); o status do atendimento nomeia a etapa, e o status do médico fica em `medicos.status_operacional`.
 - Número de atendimento (`AT000`) único e sequencial, seguro sob concorrência (RNF03) — via `AUTO_INCREMENT` + trigger no MySQL.
 - Painel médico ordenado por classificação de Manchester deve ser ordenado na query/service, nunca só no front-end (RF09).
 - Acesso por perfil (recepção, enfermagem, médico) validado em toda rota, não só na UI (RNF08).

@@ -1,6 +1,6 @@
 'use strict';
 
-const { STATUS_ATENDIMENTO } = require('../config/dominio');
+const { STATUS_ATENDIMENTO, ETAPA_ATENDIMENTO } = require('../config/dominio');
 const { PERFIS } = require('../config/perfis');
 const {
   ErroAcessoNegado, ErroConflito, ErroNaoEncontrado, ErroRegraNegocio,
@@ -15,13 +15,13 @@ const PERFIS_CLINICOS = Object.freeze([PERFIS.ENFERMAGEM, PERFIS.MEDICO]);
 /**
  * Por que um atendimento não aceita mais alteração/cancelamento da recepção,
  * ou null se aceita. RF04/RF05/RNF05: nada depois da confirmação médica.
- * RF15: nada depois de finalizado. O trigger trg_atendimentos_bu_medico
+ * RF15: nada depois de finalizado. O trigger trg_atendimentos_bu_bloqueio
  * garante o mesmo no banco para o cancelamento.
  */
 function motivoBloqueioRecepcao(atendimento) {
   if (atendimento.status === STATUS_ATENDIMENTO.FINALIZADO) return 'Atendimento finalizado não pode ser alterado.';
   if (atendimento.status === STATUS_ATENDIMENTO.CANCELADO) return 'Atendimento cancelado não pode ser alterado.';
-  if (atendimento.confirmadoMedicoEm || atendimento.status === STATUS_ATENDIMENTO.EM_ATENDIMENTO_MEDICO) {
+  if (atendimento.confirmadoMedicoEm || atendimento.status === STATUS_ATENDIMENTO.EM_CONSULTA) {
     return 'Atendimento já confirmado pelo médico não pode ser alterado nem cancelado.';
   }
   return null;
@@ -29,13 +29,14 @@ function motivoBloqueioRecepcao(atendimento) {
 
 /**
  * Recepção (RF01–RF05) e consulta de atendimento (RF03, RF11, RF14).
+ * Cobre as etapas Chegada e Atendimento Inicial do fluxo do paciente.
  *
  * Os dados do paciente são cadastrais e compartilhados entre os atendimentos
  * dele: quem volta ao PS é reconhecido pelo CPF e reaproveita o cadastro.
  */
 function criarAtendimentoService({
   atendimentoRepository, pacienteRepository, triagemRepository, prescricaoRepository,
-  historicoStatusRepository, transacao,
+  desfechoRepository, historicoStatusRepository, historicoEtapasRepository, transacao,
 }) {
   function validarPaciente(dados) {
     const d = dados && typeof dados === 'object' ? dados : {};
@@ -80,9 +81,10 @@ function criarAtendimentoService({
   }
 
   async function montarAtendimento(atendimento, solicitante, conexao) {
-    const [paciente, historico] = await Promise.all([
+    const [paciente, historico, etapas] = await Promise.all([
       pacienteRepository.buscarPorId(atendimento.pacienteId, conexao),
       historicoStatusRepository.listarPorAtendimento(atendimento.id, conexao),
+      historicoEtapasRepository.listarPorAtendimento(atendimento.id, conexao),
     ]);
 
     const resposta = {
@@ -97,15 +99,18 @@ function criarAtendimentoService({
       podeAlterar: motivoBloqueioRecepcao(atendimento) === null,
       paciente: montarPaciente(paciente, solicitante.perfil),
       historico,
+      etapas,
     };
 
     if (PERFIS_CLINICOS.includes(solicitante.perfil)) {
-      const [triagem, prescricoes] = await Promise.all([
+      const [triagem, prescricoes, desfecho] = await Promise.all([
         triagemRepository.buscarPorAtendimentoId(atendimento.id, conexao),
         prescricaoRepository.listarPorAtendimento(atendimento.id, conexao),
+        desfechoRepository.buscarPorAtendimento(atendimento.id, conexao),
       ]);
       resposta.triagem = triagem && { ...triagem, classificacao: montarClassificacao(triagem.classificacao) };
       resposta.prescricoes = prescricoes;
+      resposta.desfecho = desfecho;
     }
     return resposta;
   }
@@ -146,6 +151,19 @@ function criarAtendimentoService({
         }, conexao);
 
         const { numeroAtendimento } = await atendimentoRepository.buscarPorId(atendimentoId, conexao);
+        await historicoEtapasRepository.registrar({
+          atendimentoId,
+          etapa: ETAPA_ATENDIMENTO.CHEGADA,
+          descricao: 'Chegada do paciente ao pronto-socorro.',
+        }, conexao);
+        await historicoEtapasRepository.registrar({
+          atendimentoId,
+          etapa: ETAPA_ATENDIMENTO.ATENDIMENTO_INICIAL,
+          descricao: existente
+            ? `Atendimento inicial na recepção: cadastro existente reaproveitado e número ${numeroAtendimento} gerado.`
+            : `Atendimento inicial na recepção: cadastro do paciente e número ${numeroAtendimento} gerado.`,
+        }, conexao);
+
         const atendimento = await atendimentoRepository.buscarPorNumero(numeroAtendimento, conexao);
         return {
           pacienteJaCadastrado: Boolean(existente),

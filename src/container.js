@@ -18,6 +18,9 @@ const { criarAtendimentoRepository } = require('./repositories/atendimentoReposi
 const { criarTriagemRepository } = require('./repositories/triagemRepository');
 const { criarPrescricaoRepository } = require('./repositories/prescricaoRepository');
 const { criarHistoricoStatusRepository } = require('./repositories/historicoStatusRepository');
+const { criarConsultaRepository } = require('./repositories/consultaRepository');
+const { criarDesfechoRepository } = require('./repositories/desfechoRepository');
+const { criarHistoricoEtapasRepository } = require('./repositories/historicoEtapasRepository');
 
 const { criarTokenService } = require('./services/tokenService');
 const { criarHashSenhaService } = require('./services/hashSenhaService');
@@ -50,6 +53,9 @@ function criarContainer({ env = process.env, pool = criarPool(env) } = {}) {
   const triagemRepository = criarTriagemRepository(pool);
   const prescricaoRepository = criarPrescricaoRepository(pool);
   const historicoStatusRepository = criarHistoricoStatusRepository(pool);
+  const consultaRepository = criarConsultaRepository(pool);
+  const desfechoRepository = criarDesfechoRepository(pool);
+  const historicoEtapasRepository = criarHistoricoEtapasRepository(pool);
 
   const tokenService = criarTokenService({ segredo: env.JWT_SECRET, expiraEm: env.JWT_EXPIRES_IN || '8h' });
   const hasher = criarHashSenhaService({ custo: Number(env.BCRYPT_ROUNDS || 10) });
@@ -59,15 +65,17 @@ function criarContainer({ env = process.env, pool = criarPool(env) } = {}) {
   });
   const atendimentoService = criarAtendimentoService({
     atendimentoRepository, pacienteRepository, triagemRepository, prescricaoRepository,
-    historicoStatusRepository, transacao,
+    desfechoRepository, historicoStatusRepository, historicoEtapasRepository, transacao,
   });
   const medicoService = criarMedicoService({ medicoRepository, credencialRepository, transacao, hasher });
   const enfermeiroService = criarEnfermeiroService({ enfermeiroRepository, credencialRepository, transacao, hasher });
   const triagemService = criarTriagemService({
-    atendimentoRepository, triagemRepository, enfermeiroRepository, historicoStatusRepository, transacao,
+    atendimentoRepository, triagemRepository, enfermeiroRepository, historicoStatusRepository,
+    historicoEtapasRepository, transacao,
   });
   const painelMedicoService = criarPainelMedicoService({
-    atendimentoRepository, medicoRepository, prescricaoRepository, historicoStatusRepository, transacao,
+    atendimentoRepository, consultaRepository, desfechoRepository, medicoRepository, prescricaoRepository,
+    historicoStatusRepository, historicoEtapasRepository, transacao,
   });
 
   return {

@@ -6,8 +6,9 @@ const { criarProfissionalServiceBase } = require('./profissionalServiceBase');
 
 /**
  * Regras específicas de médicos (RF16, RF22).
- * EM_ATENDIMENTO é controlado pelo painelMedicoService: o médico não escolhe
- * esse status nem sai dele sem finalizar o atendimento.
+ * O status operacional fica na própria tabela medicos (status_operacional).
+ * EM_CONSULTA é controlado pelo painelMedicoService: o médico não escolhe
+ * esse status nem sai dele sem registrar o desfecho da consulta.
  */
 function criarMedicoService({ medicoRepository, credencialRepository, transacao, hasher }) {
   return criarProfissionalServiceBase({
@@ -18,8 +19,8 @@ function criarMedicoService({ medicoRepository, credencialRepository, transacao,
     config: {
       perfil: PERFIS.MEDICO,
       statusValidos: Object.values(STATUS_MEDICO),
-      statusSelecionaveis: [STATUS_MEDICO.DISPONIVEL, STATUS_MEDICO.PAUSA, STATUS_MEDICO.INDISPONIVEL],
-      statusInativo: STATUS_MEDICO.INDISPONIVEL,
+      statusSelecionaveis: [STATUS_MEDICO.EM_PLANTAO, STATUS_MEDICO.PAUSA, STATUS_MEDICO.FOLGA, STATUS_MEDICO.LICENCA],
+      statusInativo: STATUS_MEDICO.FOLGA,
 
       validarCamposEspecificos: (v, d) => ({
         crmNumero: v.registroProfissional('crmNumero', d.crmNumero),
@@ -35,14 +36,14 @@ function criarMedicoService({ medicoRepository, credencialRepository, transacao,
       }),
 
       motivoBloqueioDisponibilidade: (r) => (
-        r.statusDisponibilidade === STATUS_MEDICO.EM_ATENDIMENTO
-          ? 'Finalize o atendimento em andamento antes de alterar sua disponibilidade.'
+        r.statusDisponibilidade === STATUS_MEDICO.EM_CONSULTA
+          ? 'Registre o desfecho da consulta em andamento antes de alterar seu status.'
           : null
       ),
 
       motivoBloqueioDesativacao: (r) => (
-        r.statusDisponibilidade === STATUS_MEDICO.EM_ATENDIMENTO
-          ? 'Médico com atendimento em andamento não pode ser desativado.'
+        r.statusDisponibilidade === STATUS_MEDICO.EM_CONSULTA
+          ? 'Médico com consulta em andamento não pode ser desativado.'
           : null
       ),
     },

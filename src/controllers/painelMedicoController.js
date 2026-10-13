@@ -20,7 +20,7 @@ function criarPainelMedicoController({ painelMedicoService }) {
 
     async finalizar(req, res) {
       const atendimentoId = parseId(req.params.atendimentoId, 'atendimentoId');
-      res.status(200).json(await painelMedicoService.finalizar(atendimentoId, req.usuario));
+      res.status(200).json(await painelMedicoService.finalizar(atendimentoId, req.body, req.usuario));
     },
   };
 }

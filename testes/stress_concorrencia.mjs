@@ -4,8 +4,10 @@ const API = process.env.API_URL || 'http://localhost:3000/api';
 const req = async (m, c, t, b) => { const r = await fetch(API + c, { method: m, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, corpo: await r.json() }; };
 const login = async (l) => (await (await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: l, senha: 'Plantao2026' }) })).json()).token;
 const [enf, hel, raf] = await Promise.all(['enf.marina', 'dra.helena', 'dr.rafael'].map(login));
-// finaliza qualquer atendimento pendente do smoke test
-for (const t of [hel, raf]) { const em = (await req('GET', '/painel-medico', t)).corpo.emAndamento; if (em) await req('PATCH', `/painel-medico/atendimentos/${em.id}/finalizar`, t); }
+const ALTA = { tipoDesfecho: 'ALTA', descricao: 'Alta após avaliação (teste de carga).' };
+// finaliza qualquer consulta pendente do smoke test e garante os médicos em plantão
+for (const t of [hel, raf]) { const em = (await req('GET', '/painel-medico', t)).corpo.emAndamento; if (em) await req('PATCH', `/painel-medico/atendimentos/${em.id}/finalizar`, t, ALTA); }
+for (const t of [hel, raf]) await req('PATCH', '/medicos/me/disponibilidade', t, { statusDisponibilidade: 'EM_PLANTAO' });
 const cores = ['AZUL', 'VERDE', 'AMARELO', 'LARANJA', 'VERMELHO'];
 const fila = (await req('GET', '/triagens/fila', enf)).corpo;
 await Promise.all(fila.map((a, i) => req('POST', '/triagens', enf, { atendimentoId: a.id, classificacao: cores[i % 5], queixaPrincipal: 'Carga', pressaoSistolica: 120, pressaoDiastolica: 80, frequenciaCardiaca: 80, frequenciaRespiratoria: 16, temperatura: 36.5, saturacaoO2: 98 })));
@@ -19,7 +21,7 @@ async function plantao(nome, token) {
     if (r.status !== 200) throw new Error(JSON.stringify(r));
     if (!r.corpo.atendimento) return;
     atendidos[nome].push(r.corpo.atendimento.triagem.classificacao.codigo + '#' + r.corpo.atendimento.id);
-    const f = await req('PATCH', `/painel-medico/atendimentos/${r.corpo.atendimento.id}/finalizar`, token);
+    const f = await req('PATCH', `/painel-medico/atendimentos/${r.corpo.atendimento.id}/finalizar`, token, ALTA);
     if (f.status !== 200) throw new Error(JSON.stringify(f));
   }
 }

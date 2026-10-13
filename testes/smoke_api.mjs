@@ -54,9 +54,12 @@ r = await req('GET', '/painel-medico', { token: hel });
 ok('painel ordenado por Manchester', JSON.stringify(r.corpo.fila.map((f) => f.triagem.classificacao.codigo)) === '["VERMELHO","LARANJA","AMARELO","VERDE"]', r.corpo.fila?.map((f) => f.triagem.classificacao.codigo));
 ok('painel: médico vê CPF parcial', r.corpo.fila[0].paciente.cpf.startsWith('***'), r.corpo.fila[0].paciente);
 
-r = await req('POST', '/painel-medico/chamar-proximo', { token: hel }); ok('chamar com médico INDISPONIVEL 422', r.status === 422, r);
-await req('PATCH', '/medicos/me/disponibilidade', { token: hel, corpo: { statusDisponibilidade: 'DISPONIVEL' } });
-await req('PATCH', '/medicos/me/disponibilidade', { token: raf, corpo: { statusDisponibilidade: 'DISPONIVEL' } });
+r = await req('GET', '/medicos/me', { token: hel }); ok('médico nasce de FOLGA', r.corpo.statusDisponibilidade === 'FOLGA', r.corpo);
+r = await req('POST', '/painel-medico/chamar-proximo', { token: hel }); ok('chamar com médico de FOLGA 422', r.status === 422, r);
+r = await req('PATCH', '/medicos/me/disponibilidade', { token: hel, corpo: { statusDisponibilidade: 'EM_CONSULTA' } }); ok('médico não escolhe EM_CONSULTA 400', r.status === 400, r);
+r = await req('PATCH', '/medicos/me/disponibilidade', { token: hel, corpo: { statusDisponibilidade: 'LICENCA' } }); ok('médico em LICENCA', r.status === 200 && r.corpo.statusDisponibilidade === 'LICENCA', r);
+await req('PATCH', '/medicos/me/disponibilidade', { token: hel, corpo: { statusDisponibilidade: 'EM_PLANTAO' } });
+await req('PATCH', '/medicos/me/disponibilidade', { token: raf, corpo: { statusDisponibilidade: 'EM_PLANTAO' } });
 
 // Concorrência: dois médicos + duplo clique da Dra. Helena, tudo ao mesmo tempo
 const simultaneos = await Promise.all([
@@ -78,11 +81,19 @@ ok('outro médico prescrevendo 403', r.status === 403, r);
 r = await req('POST', `/painel-medico/atendimentos/${atendHel.id}/prescricoes`, { token: hel, corpo: { medicamento: 'Dipirona sódica 500 mg/mL', dosagem: '1 g', viaAdministracao: 'intravenosa', frequencia: '6/6 h' } });
 ok('prescrição pelo responsável 201', r.status === 201 && r.corpo.medicoCrm === 'CRM-SP 123456', r);
 const idHelena = (await req('GET', '/medicos/me', { token: hel })).corpo.id;
-r = await req('PATCH', `/medicos/${idHelena}/situacao`, { token: rec, corpo: { ativo: false } }); ok('desativar médico em atendimento 422', r.status === 422, r);
-r = await req('PATCH', `/painel-medico/atendimentos/${atendHel.id}/finalizar`, { token: hel }); ok('finalizar 200', r.status === 200, r);
+r = await req('PATCH', `/medicos/${idHelena}/situacao`, { token: rec, corpo: { ativo: false } }); ok('desativar médico em consulta 422', r.status === 422, r);
+r = await req('PATCH', `/painel-medico/atendimentos/${atendHel.id}/finalizar`, { token: hel }); ok('finalizar sem desfecho 400', r.status === 400 && ['tipoDesfecho', 'descricao'].every((c) => r.corpo.erro.detalhes.some((d) => d.campo === c)), r);
+r = await req('PATCH', `/painel-medico/atendimentos/${atendHel.id}/finalizar`, { token: hel, corpo: { tipoDesfecho: 'ENCAMINHAMENTO', descricao: 'Avaliação ortopédica' } });
+ok('encaminhamento sem destino 400', r.status === 400 && r.corpo.erro.detalhes.some((d) => d.campo === 'destinoEncaminhamento'), r);
+r = await req('PATCH', `/painel-medico/atendimentos/${atendHel.id}/finalizar`, { token: raf, corpo: { tipoDesfecho: 'ALTA', descricao: 'Alta' } }); ok('outro médico finalizando 403', r.status === 403, r);
+r = await req('PATCH', `/painel-medico/atendimentos/${atendHel.id}/finalizar`, { token: hel, corpo: { tipoDesfecho: 'prescricao', descricao: 'Alta com analgesia e retorno se piora.' } });
+ok('finalizar com desfecho PRESCRICAO 200', r.status === 200 && r.corpo.status === 'FINALIZADO' && r.corpo.desfecho.tipo === 'PRESCRICAO' && r.corpo.desfecho.medicoCrm === 'CRM-SP 123456', r);
 r = await req('POST', `/painel-medico/atendimentos/${atendHel.id}/prescricoes`, { token: hel, corpo: { medicamento: 'Dipirona', dosagem: '1 g', viaAdministracao: 'ORAL', frequencia: '6/6 h' } });
 ok('prescrever após finalizado 422', r.status === 422, r);
-r = await req('GET', '/medicos/me', { token: hel }); ok('médica volta a DISPONIVEL', r.corpo.statusDisponibilidade === 'DISPONIVEL', r.corpo);
+r = await req('GET', '/medicos/me', { token: hel }); ok('médica volta a EM_PLANTAO', r.corpo.statusDisponibilidade === 'EM_PLANTAO', r.corpo);
+const atendRafEmConsulta = sucessos.map((s) => s.corpo.atendimento).find((a) => a.id !== atendHel.id);
+r = await req('PATCH', `/painel-medico/atendimentos/${atendRafEmConsulta.id}/finalizar`, { token: raf, corpo: { tipoDesfecho: 'PRESCRICAO', descricao: 'Sem receita lançada' } });
+ok('desfecho PRESCRICAO sem prescrição 422', r.status === 422, r);
 
 r = await req('POST', '/medicos', { token: rec, corpo: { nome: 'Teste', cpf: '111.111.111-11', dataNascimento: '2015-01-01', email: 'x', login: 'A B', senha: '123', crmNumero: 'abc', crmUf: 'XX', especialidade: '' } });
 ok('cadastro inválido 400 com detalhes', r.status === 400 && r.corpo.erro.detalhes.length >= 8, r);
@@ -106,6 +117,9 @@ const aberto = r.corpo?.atendimento;
 ok('recepção abre atendimento 201 com número AT000', r.status === 201 && /^AT\d{3,}$/.test(aberto.numeroAtendimento) && aberto.status === 'AGUARDANDO_TRIAGEM' && r.corpo.pacienteJaCadastrado === false, r);
 ok('recepção vê CPF e RG completos e sem dados clínicos', aberto.paciente.cpf === '246.813.579-28' && aberto.paciente.rg === '445556667' && aberto.triagem === undefined, aberto);
 ok('abertura registrada no histórico pela recepção', aberto.historico.length === 1 && aberto.historico[0].statusAnterior === null && aberto.historico[0].responsavelPerfil === 'RECEPCAO', aberto.historico);
+ok('abertura registra as etapas Chegada e Atendimento Inicial', JSON.stringify(aberto.etapas.map((e) => e.etapa)) === '["CHEGADA","ATENDIMENTO_INICIAL"]' && aberto.etapas[1].descricao.includes(aberto.numeroAtendimento), aberto.etapas);
+r = await req('POST', '/atendimentos', { token: rec, corpo: { ...novoPaciente, cpf: '975.318.642-03', rg: '12.345.678-90' } });
+ok('RG com mais de 9 dígitos 400', r.status === 400 && r.corpo.erro.detalhes.some((d) => d.campo === 'rg'), r);
 r = await req('POST', '/atendimentos', { token: rec, corpo: novoPaciente }); ok('segundo atendimento ativo do mesmo CPF 409', r.status === 409, r);
 
 r = await req('GET', `/atendimentos/${aberto.numeroAtendimento.toLowerCase()}`, { token: hel });
@@ -127,11 +141,15 @@ ok('paciente que volta ao PS reaproveita o cadastro', r.status === 201 && r.corp
 
 r = await req('PATCH', `/atendimentos/${atendHel.numeroAtendimento}/paciente`, { token: rec, corpo: novoPaciente }); ok('alterar atendimento finalizado 422', r.status === 422, r);
 r = await req('PATCH', `/atendimentos/${atendHel.numeroAtendimento}/cancelar`, { token: rec }); ok('cancelar atendimento finalizado 422', r.status === 422, r);
-const atendRaf = sucessos.map((s) => s.corpo.atendimento).find((a) => a.id !== atendHel.id);
+const atendRaf = atendRafEmConsulta;
 r = await req('PATCH', `/atendimentos/${atendRaf.numeroAtendimento}/cancelar`, { token: rec }); ok('cancelar após confirmação médica 422', r.status === 422, r);
 r = await req('PATCH', `/atendimentos/${atendRaf.numeroAtendimento}/paciente`, { token: rec, corpo: novoPaciente }); ok('alterar após confirmação médica 422', r.status === 422, r);
 r = await req('GET', `/atendimentos/${atendHel.numeroAtendimento}`, { token: hel });
-ok('histórico completo do atendimento finalizado', r.status === 200 && JSON.stringify(r.corpo.historico.map((h) => h.statusNovo)) === '["AGUARDANDO_TRIAGEM","AGUARDANDO_MEDICO","EM_ATENDIMENTO_MEDICO","FINALIZADO"]' && r.corpo.prescricoes.length === 1, r.corpo);
+ok('histórico completo do atendimento finalizado', r.status === 200 && JSON.stringify(r.corpo.historico.map((h) => h.statusNovo)) === '["AGUARDANDO_TRIAGEM","AGUARDANDO_CONSULTA","EM_CONSULTA","FINALIZADO"]' && r.corpo.prescricoes.length === 1, r.corpo);
+ok('etapas na ordem Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho', JSON.stringify(r.corpo.etapas.map((e) => e.etapa)) === '["CHEGADA","ATENDIMENTO_INICIAL","TRIAGEM","CONSULTA","DESFECHO"]' && r.corpo.etapas.every((e) => typeof e.descricao === 'string' && e.descricao.length > 3), r.corpo.etapas);
+ok('médico vê o desfecho no atendimento', r.corpo.desfecho && r.corpo.desfecho.tipo === 'PRESCRICAO', r.corpo.desfecho);
+r = await req('GET', `/atendimentos/${atendHel.numeroAtendimento}`, { token: rec });
+ok('recepção vê etapas mas não o desfecho clínico', Array.isArray(r.corpo.etapas) && r.corpo.etapas.length === 5 && r.corpo.desfecho === undefined, r.corpo);
 
 r = await req('GET', '/rota/inexistente'); ok('404 rota', r.status === 404, r);
 

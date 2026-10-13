@@ -8,6 +8,7 @@ const { asyncHandler } = require('../utils/asyncHandler');
  * POST  /painel-medico/chamar-proximo                     ATENDIMENTO_CHAMAR_PROXIMO
  * POST  /painel-medico/atendimentos/:atendimentoId/prescricoes  PRESCRICAO_REGISTRAR
  * PATCH /painel-medico/atendimentos/:atendimentoId/finalizar    ATENDIMENTO_FINALIZAR
+ *       corpo: { tipoDesfecho, descricao, destinoEncaminhamento? } (desfecho, RF24)
  */
 function criarPainelMedicoRoutes({ painelMedicoController: c, autenticar, autorizar }) {
   const router = express.Router();

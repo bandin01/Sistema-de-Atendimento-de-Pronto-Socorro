@@ -109,10 +109,11 @@ function criarValidador() {
       return cpfValido(digitos) ? digitos : falhar(campo, 'CPF inválido.');
     },
 
+    // Coluna rg VARCHAR(9) + CHECK chk_*_rg (migration 013): mesma regra aqui.
     rg(campo, valor, { obrigatorio = false } = {}) {
       if (!exigir(campo, valor, obrigatorio)) return null;
       const limpo = String(valor).toUpperCase().replace(/[^0-9X]/g, '');
-      return /^[0-9X]{5,14}$/.test(limpo) ? limpo : falhar(campo, 'RG inválido.');
+      return /^[0-9X]{5,9}$/.test(limpo) ? limpo : falhar(campo, 'RG inválido (5 a 9 dígitos).');
     },
 
     email(campo, valor, { obrigatorio = true } = {}) {

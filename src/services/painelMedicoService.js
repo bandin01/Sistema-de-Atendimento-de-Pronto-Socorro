@@ -1,6 +1,8 @@
 'use strict';
 
-const { STATUS_ATENDIMENTO, STATUS_MEDICO } = require('../config/dominio');
+const {
+  STATUS_ATENDIMENTO, ETAPA_ATENDIMENTO, TIPO_DESFECHO, STATUS_MEDICO,
+} = require('../config/dominio');
 const { CLASSIFICACOES_MANCHESTER } = require('../config/manchester');
 const { PERFIS } = require('../config/perfis');
 const {
@@ -14,14 +16,24 @@ const VIAS_ADMINISTRACAO = Object.freeze([
   'INALATORIA', 'NASAL', 'TOPICA', 'OFTALMICA', 'RETAL', 'OUTRA',
 ]);
 
+const TIPOS_DESFECHO = Object.freeze(Object.values(TIPO_DESFECHO));
+
+const ROTULO_DESFECHO = Object.freeze({
+  [TIPO_DESFECHO.PRESCRICAO]: 'alta com prescrição',
+  [TIPO_DESFECHO.EXAMES]: 'alta com pedido de exames',
+  [TIPO_DESFECHO.ENCAMINHAMENTO]: 'encaminhamento',
+  [TIPO_DESFECHO.ALTA]: 'alta',
+});
+
 /**
- * Painel médico e atendimento (RF09–RF13, RF15, RF19–RF21).
+ * Painel médico, etapas Consulta e Desfecho (RF09–RF13, RF15, RF19–RF21, RF24).
  *
  * Ordem de bloqueio SEMPRE: médico → atendimento. Manter essa ordem em todos
  * os fluxos evita deadlock entre "chamar próximo" e "finalizar".
  */
 function criarPainelMedicoService({
-  atendimentoRepository, medicoRepository, prescricaoRepository, historicoStatusRepository, transacao,
+  atendimentoRepository, consultaRepository, desfechoRepository, medicoRepository, prescricaoRepository,
+  historicoStatusRepository, historicoEtapasRepository, transacao,
 }) {
   async function obterMedico(solicitante, conexao, opcoes) {
     if (solicitante.perfil !== PERFIS.MEDICO) throw new ErroAcessoNegado();
@@ -31,16 +43,16 @@ function criarPainelMedicoService({
     return medico;
   }
 
-  function garantirAtendimentoDoMedico(atendimento, medico) {
+  function garantirConsultaDoMedico(atendimento, medico) {
     if (!atendimento) throw new ErroNaoEncontrado('Atendimento não encontrado.');
     if (atendimento.status === STATUS_ATENDIMENTO.FINALIZADO) {
       throw new ErroRegraNegocio('Atendimento finalizado não pode ser alterado.');
     }
-    if (atendimento.status !== STATUS_ATENDIMENTO.EM_ATENDIMENTO_MEDICO) {
-      throw new ErroRegraNegocio('Este atendimento não está em atendimento médico.');
+    if (atendimento.status !== STATUS_ATENDIMENTO.EM_CONSULTA) {
+      throw new ErroRegraNegocio('Este atendimento não está em consulta.');
     }
     if (atendimento.medicoId !== medico.id) {
-      throw new ErroAcessoNegado('Somente o médico responsável pode alterar este atendimento.');
+      throw new ErroAcessoNegado('Somente o médico responsável pela consulta pode alterar este atendimento.');
     }
   }
 
@@ -83,8 +95,30 @@ function criarPainelMedicoService({
     return prescricao;
   }
 
+  /** RF24: desfecho obrigatório; destino só (e sempre) no encaminhamento. */
+  function validarDesfecho(dados) {
+    const d = dados && typeof dados === 'object' ? dados : {};
+    const v = criarValidador();
+    const tipo = v.enumeracao('tipoDesfecho', d.tipoDesfecho, TIPOS_DESFECHO);
+    const desfecho = {
+      tipo,
+      descricao: v.texto('descricao', d.descricao, { min: 3, max: 500 }),
+      destinoEncaminhamento: tipo === TIPO_DESFECHO.ENCAMINHAMENTO
+        ? v.texto('destinoEncaminhamento', d.destinoEncaminhamento, { min: 3, max: 150 })
+        : null,
+    };
+    v.garantirValido('Revise o desfecho do atendimento.');
+    return desfecho;
+  }
+
+  function descreverDesfecho(desfecho, medico) {
+    const destino = desfecho.destinoEncaminhamento ? ` para ${desfecho.destinoEncaminhamento}` : '';
+    return `Desfecho registrado por ${medico.nome}: ${ROTULO_DESFECHO[desfecho.tipo]}${destino}.`;
+  }
+
   return {
     viasAdministracao: VIAS_ADMINISTRACAO,
+    tiposDesfecho: TIPOS_DESFECHO,
 
     async visualizar(solicitante) {
       const medico = await obterMedico(solicitante);
@@ -117,34 +151,35 @@ function criarPainelMedicoService({
         resumo,
         fila,
         viasAdministracao: VIAS_ADMINISTRACAO,
+        tiposDesfecho: TIPOS_DESFECHO,
         atualizadoEm: new Date().toISOString(),
       };
     },
 
     /**
-     * Chama o paciente de maior prioridade (RF09/RF19/RF20).
+     * Chama o paciente de maior prioridade e abre a Consulta (RF09/RF19/RF20).
      * O médico não escolhe paciente fora da ordem: a prioridade é garantida no back-end.
      */
     async chamarProximo(solicitante) {
       return transacao.executar(async (conexao) => {
         const medico = await obterMedico(solicitante, conexao, { bloquear: true });
 
-        if (medico.statusDisponibilidade === STATUS_MEDICO.EM_ATENDIMENTO) {
-          throw new ErroConflito('Você já tem um atendimento em andamento. Finalize-o antes de chamar o próximo paciente.');
+        if (medico.statusDisponibilidade === STATUS_MEDICO.EM_CONSULTA) {
+          throw new ErroConflito('Você já tem uma consulta em andamento. Registre o desfecho antes de chamar o próximo paciente.');
         }
-        if (medico.statusDisponibilidade !== STATUS_MEDICO.DISPONIVEL) {
-          throw new ErroRegraNegocio('Altere sua disponibilidade para "Disponível" para chamar pacientes.');
+        if (medico.statusDisponibilidade !== STATUS_MEDICO.EM_PLANTAO) {
+          throw new ErroRegraNegocio('Altere seu status para "Em plantão" para chamar pacientes.');
         }
 
         const candidatos = await atendimentoRepository.listarCandidatosFilaMedica(conexao);
         if (candidatos.length === 0) {
-          return { atendimento: null, mensagem: 'Nenhum paciente aguardando atendimento médico.' };
+          return { atendimento: null, mensagem: 'Nenhum paciente aguardando consulta.' };
         }
 
         let atendimentoId = null;
         for (const candidatoId of candidatos) {
           // eslint-disable-next-line no-await-in-loop -- tentativa sequencial é intencional
-          if (await atendimentoRepository.vincularMedico(candidatoId, medico.id, conexao) === 1) {
+          if (await atendimentoRepository.iniciarConsulta(candidatoId, conexao) === 1) {
             atendimentoId = candidatoId;
             break;
           }
@@ -153,12 +188,18 @@ function criarPainelMedicoService({
           throw new ErroConflito('Outros médicos chamaram os próximos pacientes neste instante. Tente novamente.');
         }
 
-        await medicoRepository.atualizarDisponibilidade(medico.id, STATUS_MEDICO.EM_ATENDIMENTO, conexao);
+        await consultaRepository.criar({ atendimentoId, medicoId: medico.id }, conexao);
+        await medicoRepository.atualizarDisponibilidade(medico.id, STATUS_MEDICO.EM_CONSULTA, conexao);
         await historicoStatusRepository.registrar({
           atendimentoId,
-          statusAnterior: STATUS_ATENDIMENTO.AGUARDANDO_MEDICO,
-          statusNovo: STATUS_ATENDIMENTO.EM_ATENDIMENTO_MEDICO,
+          statusAnterior: STATUS_ATENDIMENTO.AGUARDANDO_CONSULTA,
+          statusNovo: STATUS_ATENDIMENTO.EM_CONSULTA,
           responsavel: solicitante,
+        }, conexao);
+        await historicoEtapasRepository.registrar({
+          atendimentoId,
+          etapa: ETAPA_ATENDIMENTO.CONSULTA,
+          descricao: `Consulta iniciada por ${medico.nome} (CRM-${medico.crmUf} ${medico.crmNumero}).`,
         }, conexao);
 
         const linha = await atendimentoRepository.buscarEmAndamentoDoMedico(medico.id, conexao);
@@ -172,38 +213,57 @@ function criarPainelMedicoService({
       return transacao.executar(async (conexao) => {
         const medico = await obterMedico(solicitante, conexao);
         const atendimento = await atendimentoRepository.buscarPorId(atendimentoId, conexao, { bloquear: true });
-        garantirAtendimentoDoMedico(atendimento, medico);
+        garantirConsultaDoMedico(atendimento, medico);
 
         const id = await prescricaoRepository.criar({ ...prescricao, atendimentoId, medicoId: medico.id }, conexao);
         return prescricaoRepository.buscarPorId(id, conexao);
       });
     },
 
-    async finalizar(atendimentoId, solicitante) {
+    /**
+     * Desfecho/Finalização (RF13, RF24): registra o desfecho, encerra a consulta
+     * e finaliza o atendimento, tudo na mesma transação.
+     */
+    async finalizar(atendimentoId, dados, solicitante) {
+      const desfecho = validarDesfecho(dados);
+
       return transacao.executar(async (conexao) => {
         const medico = await obterMedico(solicitante, conexao, { bloquear: true });
         const atendimento = await atendimentoRepository.buscarPorId(atendimentoId, conexao, { bloquear: true });
-        garantirAtendimentoDoMedico(atendimento, medico);
+        garantirConsultaDoMedico(atendimento, medico);
 
-        if (await atendimentoRepository.finalizar(atendimentoId, medico.id, conexao) !== 1) {
+        if (desfecho.tipo === TIPO_DESFECHO.PRESCRICAO
+            && (await prescricaoRepository.listarPorAtendimento(atendimentoId, conexao)).length === 0) {
+          throw new ErroRegraNegocio('Desfecho "PRESCRICAO" exige ao menos uma prescrição registrada.');
+        }
+
+        await desfechoRepository.criar({ ...desfecho, consultaId: atendimento.consultaId }, conexao);
+        if (await consultaRepository.finalizar(atendimento.consultaId, conexao) !== 1
+            || await atendimentoRepository.finalizar(atendimentoId, conexao) !== 1) {
           throw new ErroConflito('Não foi possível finalizar: o atendimento foi alterado. Recarregue o painel.');
         }
-        await medicoRepository.atualizarDisponibilidade(medico.id, STATUS_MEDICO.DISPONIVEL, conexao);
+        await medicoRepository.atualizarDisponibilidade(medico.id, STATUS_MEDICO.EM_PLANTAO, conexao);
         await historicoStatusRepository.registrar({
           atendimentoId,
-          statusAnterior: STATUS_ATENDIMENTO.EM_ATENDIMENTO_MEDICO,
+          statusAnterior: STATUS_ATENDIMENTO.EM_CONSULTA,
           statusNovo: STATUS_ATENDIMENTO.FINALIZADO,
           responsavel: solicitante,
+        }, conexao);
+        await historicoEtapasRepository.registrar({
+          atendimentoId,
+          etapa: ETAPA_ATENDIMENTO.DESFECHO,
+          descricao: descreverDesfecho(desfecho, medico),
         }, conexao);
 
         return {
           id: atendimento.id,
           numeroAtendimento: atendimento.numeroAtendimento,
           status: STATUS_ATENDIMENTO.FINALIZADO,
+          desfecho: await desfechoRepository.buscarPorAtendimento(atendimentoId, conexao),
         };
       });
     },
   };
 }
 
-module.exports = { criarPainelMedicoService, VIAS_ADMINISTRACAO };
+module.exports = { criarPainelMedicoService, VIAS_ADMINISTRACAO, TIPOS_DESFECHO };
