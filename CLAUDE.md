@@ -1,50 +1,67 @@
-# Projeto Integrador 2 — Back-end (Sistema de Atendimento de Pronto-Socorro)
+# Projeto Integrador 2 — Sistema de Atendimento de Pronto-Socorro
 
-Este repositório contém **apenas o back-end** do sistema. O front-end vive em um repositório separado.
+Este repositório contém o **sistema completo**: front-end (HTML/CSS/JS), back-end (Node.js) e banco de dados (MySQL). O mesmo servidor (`servidor.js`) entrega as páginas e responde à API em `/api/...`.
 
 ## Fontes de verdade
 
 Antes de implementar qualquer funcionalidade ou tirar dúvida sobre requisito/fluxo, consulte:
 
-- `fontes_de_verdade_sistema/requisitos.md` — requisitos funcionais (RF01-RF15) e não funcionais (RNF01-RNF09).
+- `fontes_de_verdade_sistema/requisitos.md` — requisitos funcionais e não funcionais.
 - `fontes_de_verdade_sistema/guia_desenvolvimento.md` — passo a passo de implementação, fase a fase.
+- `docs/` — MER, DER, dicionário de dados e requisitos do projeto.
 
 Esses arquivos são a referência oficial. Se um requisito não estiver claro ou parecer conflitar com o que está sendo implementado, releia esses arquivos antes de assumir comportamento.
 
 ## Stack
 
-HTML/CSS/JS ficam no front-end (repo separado). Aqui: **Node.js + MySQL** (driver `mysql2`).
+- **Front-end:** HTML5, CSS e JavaScript puro (sem frameworks).
+- **Back-end:** Node.js com os módulos nativos `http`, `fs` e `url` + `mysql2` (sem Express). Estilo de código de aula: `let`, `require`/`exports`, callbacks.
+- **Banco:** MySQL 8.0.16+ (usa CHECK constraints e triggers).
 
-## Arquitetura
-
-Camadas simples, sem DDD tático (agregados, value objects, domain events) — o domínio é linear (chegada → atendimento inicial → triagem → consulta → desfecho) e não justifica essa complexidade:
+## Estrutura
 
 ```
-/src
-  /routes         endpoints HTTP por módulo (recepção, triagem, médico)
-  /controllers    parsing de request/response, sem regra de negócio
-  /services       regras de negócio (bloqueios, validações, geração de AT000)
-  /repositories   acesso ao MySQL
-  /middlewares    autenticação, autorização por perfil, validação
-  /db             schema, triggers, migrations
+servidor.js        servidor HTTP: arquivos estáticos + tabela de rotas da API (rotas['MÉTODO /caminho'])
+modulos/           back-end — regras de negócio e acesso ao MySQL
+  banco.js         pool de conexões, executarEmOrdem, transacao (usuário/senha do MySQL ficam aqui)
+  atendimentos.js  recepção: incluir, consultar, alterar, cancelar
+  triagem.js       fila e registro da triagem (Manchester)
+  medico.js        painel, chamar próximo, prescrições, finalizar com desfecho
+  profissionais.js listas de recepcionistas, enfermeiros e médicos
+  historico.js     histórico de status e de etapas
+  utilitarios.js   funções pequenas reaproveitadas (erro, texto, numeroAtendimento…)
+index.html         página inicial
+HTMLs/             telas: recepcao, triagem, painel_medico, consulta_medica
+javascripts/       comum.js + um .js por tela (chamadas à API e manipulação do DOM)
+CSSs/estilo.css    estilos
+imagens/           logo
+banco/             scripts SQL numerados + dados_iniciais.sql + script_completo.sql (tudo junto)
+docs/              MER, DER, dicionário de dados, requisitos, imagens dos diagramas
 ```
 
-Regra de dependência: `routes → controllers → services → repositories`. Regra de negócio vive em `services`, nunca em `controllers` ou só no front-end.
+Regra de negócio vive em `modulos/` (back-end), nunca só no front-end. O `servidor.js` só roteia: cada rota chama uma função de um módulo, que devolve `callback(erro, resultado)`, com erros criados por `util.erro(status, mensagem)`.
 
-### Princípios de código
+Ao mudar o banco, crie um novo script numerado em `banco/` **e** atualize `banco/script_completo.sql` e a documentação em `docs/`.
 
-Seguir **SOLID**. Use o skill `/solid-review` para revisar código novo contra os princípios SOLID e a arquitetura em camadas antes de considerar uma spec concluída.
+## Como executar
+
+```bash
+mysql -u root -p < banco/script_completo.sql   # cria o banco com dados de exemplo
+npm install                                     # se não houver node_modules
+node servidor.js                                # http://localhost:3000
+```
 
 ## Regras de negócio inegociáveis (validar sempre no back-end)
 
 - Bloquear alteração/cancelamento de atendimento após confirmação médica (RF04, RF05, RNF05).
 - Impedir qualquer alteração em atendimentos finalizados (RF15).
 - Triagem, Consulta, Desfecho e Prescrição nunca existem sem um Atendimento válido (RNF04).
-- Atendimento só é finalizado com desfecho registrado (RF24); o status do atendimento nomeia a etapa, e o status do médico fica em `medicos.status_operacional`.
-- Número de atendimento (`AT000`) único e sequencial, seguro sob concorrência (RNF03) — via `AUTO_INCREMENT` + trigger no MySQL.
-- Painel médico ordenado por classificação de Manchester deve ser ordenado na query/service, nunca só no front-end (RF09).
-- Acesso por perfil (recepção, enfermagem, médico) validado em toda rota, não só na UI (RNF08).
-- CPF/RG mascarados nas respostas da API conforme o perfil (RNF09).
+- Atendimento só é finalizado com desfecho registrado (PRESCRICAO, EXAMES, ENCAMINHAMENTO ou ALTA); o status do atendimento nomeia a etapa, e o status do médico fica em `medicos.status_operacional`.
+- Número de atendimento (`AT0001`) único e sequencial, seguro sob concorrência (RNF03) — via `AUTO_INCREMENT` + trigger no MySQL.
+- Painel médico ordenado por classificação de Manchester na query SQL (`ORDER BY FIELD(...)`), nunca só no front-end (RF09).
+- Operações concorrentes (alterar, cancelar, chamar próximo, finalizar) dentro de transação com `SELECT ... FOR UPDATE`.
+
+Pendentes em relação aos requisitos (ainda não implementados nesta versão): controle de acesso por perfil validado nas rotas (RNF08) e mascaramento de CPF/RG nas respostas da API (RNF09).
 
 ## Fluxo de trabalho
 
@@ -60,4 +77,4 @@ Claude quando for para desenvolvimento de nova feature ou correcao de bug sempre
   9. Escrever um arquivo chamado changes.md no qual constata todas as alteracoes (diff da branch) do repositorio
   10. Fazer commit push
 
-Seguir a ordem das fases do `guia_desenvolvimento.md`: modelagem do banco → API/regras de negócio → (front-end no outro repo) → segurança/controle de acesso → não funcionais → testes. Não pular etapas.
+Seguir a ordem das fases do `guia_desenvolvimento.md`: modelagem do banco → API/regras de negócio → front-end → segurança/controle de acesso → não funcionais → testes. Não pular etapas.
