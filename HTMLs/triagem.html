@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Triagem - Pronto Socorro</title>
+  <link rel="stylesheet" href="../CSSs/estilo.css">
+  <link rel="icon" href="../imagens/logo.svg">
+</head>
+<body>
+  <header>
+    <figure>
+      <img src="../imagens/logo.svg" alt="Logotipo do Pronto Socorro" title="Pronto Socorro">
+    </figure>
+    <div>
+      <h1>Triagem</h1>
+      <p>Enfermagem: sinais vitais, queixas e classificação de risco</p>
+    </div>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="../index.html">Início</a></li>
+      <li><a href="recepcao.html">Recepção</a></li>
+      <li><a href="triagem.html" class="atual">Triagem</a></li>
+      <li><a href="painel_medico.html">Painel do Médico</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section>
+      <h2>Enfermeiro(a) responsável</h2>
+      <form class="linha" onsubmit="return false">
+        <label>Enfermeiro(a)
+          <select id="enfermeiro"></select>
+        </label>
+      </form>
+    </section>
+
+    <section class="rolagem">
+      <h2>Fila da triagem</h2>
+      <p id="msgTriagem" class="mensagem" hidden></p>
+      <table>
+        <caption>Pacientes aguardando triagem, por ordem de chegada</caption>
+        <thead>
+          <tr><th>Número</th><th>Paciente</th><th>Idade</th><th>Chegada</th><th></th></tr>
+        </thead>
+        <tbody id="tabelaFila"></tbody>
+      </table>
+    </section>
+
+    <section id="secaoTriagem" hidden>
+      <h2 id="tituloTriagem"></h2>
+      <form id="formTriagem">
+        <fieldset>
+          <legend>Sinais vitais</legend>
+          <label>Pressão sistólica (mmHg) *
+            <input type="number" name="pressao_sistolica" min="50" max="300" placeholder="120" required>
+          </label>
+          <label>Pressão diastólica (mmHg) *
+            <input type="number" name="pressao_diastolica" min="20" max="200" placeholder="80" required>
+          </label>
+          <label>Temperatura (°C) *
+            <input type="number" name="temperatura" min="30" max="45" step="0.1" placeholder="36.5" required>
+          </label>
+          <label>Batimentos cardíacos (bpm) *
+            <input type="number" name="frequencia_cardiaca" min="20" max="250" placeholder="80" required>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Principais queixas *</legend>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Dor de cabeça"> Dor de cabeça</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Náusea"> Náusea</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Enjoo"> Enjoo</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Dor muscular"> Dor muscular</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Suor excessivo"> Suor excessivo</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Febre"> Febre</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Falta de ar"> Falta de ar</label>
+          <label class="opcao"><input type="checkbox" class="queixa" value="Dor no peito"> Dor no peito</label>
+          <label class="largura-total">Outras queixas / observações
+            <textarea id="outrasQueixas" maxlength="400" placeholder="Ex.: dor há 2 dias, piora ao deitar..."></textarea>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Classificação de Manchester *</legend>
+          <label class="opcao"><input type="radio" name="classificacao_manchester" value="VERMELHO" required>
+            <span class="manchester vermelho">VERMELHO – Emergência</span></label>
+          <label class="opcao"><input type="radio" name="classificacao_manchester" value="LARANJA">
+            <span class="manchester laranja">LARANJA – Muito urgente</span></label>
+          <label class="opcao"><input type="radio" name="classificacao_manchester" value="AMARELO">
+            <span class="manchester amarelo">AMARELO – Urgente</span></label>
+          <label class="opcao"><input type="radio" name="classificacao_manchester" value="VERDE">
+            <span class="manchester verde">VERDE – Pouco urgente</span></label>
+          <label class="opcao"><input type="radio" name="classificacao_manchester" value="AZUL">
+            <span class="manchester azul">AZUL – Não urgente</span></label>
+        </fieldset>
+
+        <div class="botoes">
+          <button type="submit">Registrar triagem</button>
+          <button type="button" id="botaoFechar" class="secundario">Fechar</button>
+        </div>
+      </form>
+      <p id="msgFormulario" class="mensagem" hidden></p>
+    </section>
+  </main>
+
+  <aside>
+    <section>
+      <h2>Protocolo de Manchester</h2>
+      <table>
+        <caption>Classificação de risco</caption>
+        <thead>
+          <tr><th>Cor</th><th>Prioridade</th><th>Tempo-alvo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="manchester vermelho">Vermelho</span></td><td>Emergência</td><td>Imediato</td></tr>
+          <tr><td><span class="manchester laranja">Laranja</span></td><td>Muito urgente</td><td>10 min</td></tr>
+          <tr><td><span class="manchester amarelo">Amarelo</span></td><td>Urgente</td><td>60 min</td></tr>
+          <tr><td><span class="manchester verde">Verde</span></td><td>Pouco urgente</td><td>120 min</td></tr>
+          <tr><td><span class="manchester azul">Azul</span></td><td>Não urgente</td><td>240 min</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </aside>
+
+  <footer>
+    PUC-Campinas &middot; Projeto Integrador 2 &middot; Sistema de Atendimento de Pronto Socorro &middot; 2026
+  </footer>
+
+  <script src="../javascripts/comum.js"></script>
+  <script src="../javascripts/triagem.js"></script>
+</body>
+</html>

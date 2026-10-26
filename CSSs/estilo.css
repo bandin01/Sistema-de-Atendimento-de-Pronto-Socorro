@@ -1,0 +1,393 @@
+/* Folha de estilos do Sistema de Atendimento de Pronto Socorro */
+
+* {
+  box-sizing: border-box;
+}
+
+/* Elementos com o atributo hidden ficam escondidos mesmo com display flex/grid */
+[hidden] {
+  display: none !important;
+}
+
+/* Layout da página com as tags estruturais do HTML5:
+   header e nav em cima, main e aside lado a lado, footer embaixo. */
+body {
+  margin: 0 auto;
+  max-width: 1200px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  color: #1f2933;
+  background-color: #eef2f5;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-areas:
+    "header header"
+    "nav    nav"
+    "main   aside"
+    "footer footer";
+  gap: 0 20px;
+}
+
+body.sem-aside {
+  grid-template-columns: 1fr;
+  grid-template-areas: "header" "nav" "main" "footer";
+}
+
+header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background-color: #0b6e8a;
+  color: #ffffff;
+}
+
+header figure {
+  margin: 0;
+}
+
+header img {
+  display: block;
+  width: 56px;
+  height: 56px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+header p {
+  margin: 4px 0 0;
+  color: #d4ecf3;
+}
+
+nav {
+  grid-area: nav;
+  background-color: #084c61;
+  padding: 0 12px;
+}
+
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+nav a {
+  display: block;
+  padding: 12px 16px;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+nav a:hover,
+nav a.atual {
+  background-color: #0b6e8a;
+}
+
+main {
+  grid-area: main;
+  padding: 20px 0;
+}
+
+aside {
+  grid-area: aside;
+  padding: 20px 0;
+}
+
+footer {
+  grid-area: footer;
+  padding: 16px 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #52606d;
+  border-top: 1px solid #cbd2d9;
+}
+
+section,
+article,
+aside > section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+section section,
+article section {
+  box-shadow: none;
+  padding: 0;
+  margin: 24px 0 0;
+}
+
+h2 {
+  margin-top: 0;
+  color: #084c61;
+  font-size: 20px;
+}
+
+h3 {
+  color: #084c61;
+}
+
+/* ---------- Formulários ---------- */
+form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px 16px;
+}
+
+form.linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+fieldset {
+  grid-column: 1 / -1;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+legend {
+  font-weight: bold;
+  color: #084c61;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+label.opcao {
+  flex-direction: row;
+  align-items: center;
+  font-weight: normal;
+}
+
+.largura-total {
+  grid-column: 1 / -1;
+}
+
+fieldset .largura-total {
+  width: 100%;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-weight: normal;
+  padding: 8px;
+  border: 1px solid #9aa5b1;
+  border-radius: 4px;
+  background-color: #ffffff;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+}
+
+textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.botoes {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+button {
+  font: inherit;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 4px;
+  background-color: #0b6e8a;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #084c61;
+}
+
+button.secundario {
+  background-color: #e4e7eb;
+  color: #1f2933;
+}
+
+button.perigo {
+  background-color: #b3261e;
+}
+
+button:disabled {
+  background-color: #9aa5b1;
+  cursor: not-allowed;
+}
+
+button.pequeno {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+/* ---------- Mensagens ---------- */
+.mensagem {
+  padding: 10px 14px;
+  border-radius: 4px;
+}
+
+.mensagem.sucesso {
+  background-color: #e3f4e8;
+  color: #1e6b34;
+  border-left: 4px solid #1e6b34;
+}
+
+.mensagem.erro {
+  background-color: #fdecea;
+  color: #b3261e;
+  border-left: 4px solid #b3261e;
+}
+
+.mensagem.aviso {
+  background-color: #fff6db;
+  color: #7a5b00;
+  border-left: 4px solid #d9a400;
+}
+
+/* ---------- Tabelas ---------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+caption {
+  text-align: left;
+  font-weight: bold;
+  padding-bottom: 8px;
+  color: #52606d;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #e4e7eb;
+  vertical-align: top;
+}
+
+thead th {
+  background-color: #f0f4f8;
+}
+
+td a {
+  color: #0b6e8a;
+  font-weight: bold;
+}
+
+.rolagem {
+  overflow-x: auto;
+}
+
+/* ---------- Listas de dados (dl) ---------- */
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+}
+
+dt {
+  font-weight: bold;
+  color: #52606d;
+}
+
+dd {
+  margin: 0;
+}
+
+/* ---------- Classificação de Manchester ---------- */
+.manchester {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 13px;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.vermelho { background-color: #c62828; }
+.laranja  { background-color: #ef6c00; }
+.amarelo  { background-color: #f9c80e; color: #1f2933; }
+.verde    { background-color: #2e7d32; }
+.azul     { background-color: #1565c0; }
+
+tr.vermelho, tr.laranja, tr.amarelo, tr.verde, tr.azul {
+  background-color: transparent;
+  color: inherit;
+}
+
+tr.vermelho td:first-child { border-left: 6px solid #c62828; }
+tr.laranja  td:first-child { border-left: 6px solid #ef6c00; }
+tr.amarelo  td:first-child { border-left: 6px solid #f9c80e; }
+tr.verde    td:first-child { border-left: 6px solid #2e7d32; }
+tr.azul     td:first-child { border-left: 6px solid #1565c0; }
+
+.atrasado {
+  color: #b3261e;
+  font-weight: bold;
+}
+
+.status {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 13px;
+  background-color: #e4e7eb;
+}
+
+/* ---------- Página inicial ---------- */
+.areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.areas article {
+  margin: 0;
+  border: 1px solid #cbd2d9;
+  box-shadow: none;
+}
+
+.areas a {
+  color: #0b6e8a;
+  font-weight: bold;
+}
+
+/* Telas estreitas (celular): uma coluna só */
+@media (max-width: 900px) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-areas: "header" "nav" "main" "aside" "footer";
+  }
+  main,
+  aside {
+    padding: 16px;
+  }
+}

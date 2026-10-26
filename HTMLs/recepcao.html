@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recepção - Pronto Socorro</title>
+  <link rel="stylesheet" href="../CSSs/estilo.css">
+  <link rel="icon" href="../imagens/logo.svg">
+</head>
+<body class="sem-aside">
+  <header>
+    <figure>
+      <img src="../imagens/logo.svg" alt="Logotipo do Pronto Socorro" title="Pronto Socorro">
+    </figure>
+    <div>
+      <h1>Recepção</h1>
+      <p>Inclusão, consulta, alteração e cancelamento de atendimentos</p>
+    </div>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="../index.html">Início</a></li>
+      <li><a href="recepcao.html" class="atual">Recepção</a></li>
+      <li><a href="triagem.html">Triagem</a></li>
+      <li><a href="painel_medico.html">Painel do Médico</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section>
+      <h2>Recepcionista responsável</h2>
+      <form class="linha" onsubmit="return false">
+        <label>Recepcionista
+          <select id="recepcionista"></select>
+        </label>
+      </form>
+    </section>
+
+    <!-- INCLUSÃO DO ATENDIMENTO -->
+    <section>
+      <h2>Novo atendimento</h2>
+      <form id="formNovo">
+        <label class="largura-total">Nome completo *
+          <input type="text" name="nome" maxlength="150" required>
+        </label>
+        <label class="largura-total">Endereço *
+          <input type="text" name="endereco" maxlength="255" required placeholder="Rua, número - bairro, cidade/UF">
+        </label>
+        <label>CPF
+          <input type="text" name="cpf" maxlength="14" placeholder="000.000.000-00">
+        </label>
+        <label>RG
+          <input type="text" name="rg" maxlength="12" placeholder="Somente números (ou X)">
+        </label>
+        <label>Data de nascimento *
+          <input type="date" name="data_nascimento" required>
+        </label>
+        <label>Nome do pai
+          <input type="text" name="nome_pai" maxlength="150">
+        </label>
+        <label>Nome da mãe
+          <input type="text" name="nome_mae" maxlength="150">
+        </label>
+        <div class="botoes">
+          <button type="submit">Gerar número de atendimento</button>
+          <button type="reset" class="secundario">Limpar</button>
+        </div>
+      </form>
+      <p><small>* Campos obrigatórios. CPF e RG podem ficar em branco se o paciente chegar sem documento.</small></p>
+      <p id="msgNovo" class="mensagem" hidden></p>
+    </section>
+
+    <!-- CONSULTA, ALTERAÇÃO E CANCELAMENTO -->
+    <section>
+      <h2>Consultar atendimento</h2>
+      <form id="formBusca" class="linha">
+        <label>Número do atendimento
+          <input type="text" id="numeroBusca" maxlength="12" placeholder="AT0001" required>
+        </label>
+        <button type="submit">Consultar</button>
+      </form>
+      <p id="msgBusca" class="mensagem" hidden></p>
+
+      <article id="detalhe" hidden>
+        <h3 id="tituloDetalhe"></h3>
+        <dl id="dadosAtendimento"></dl>
+
+        <p id="avisoBloqueio" class="mensagem aviso" hidden></p>
+        <div class="botoes" id="botoesAcoes">
+          <button type="button" id="botaoAlterar">Alterar dados do paciente</button>
+          <button type="button" id="botaoCancelar" class="perigo">Cancelar atendimento</button>
+        </div>
+
+        <section id="secaoAlterar" hidden>
+          <h3>Alterar dados do paciente</h3>
+          <form id="formAlterar">
+            <label class="largura-total">Nome completo *
+              <input type="text" name="nome" maxlength="150" required>
+            </label>
+            <label class="largura-total">Endereço *
+              <input type="text" name="endereco" maxlength="255" required>
+            </label>
+            <label>CPF
+              <input type="text" name="cpf" maxlength="14">
+            </label>
+            <label>RG
+              <input type="text" name="rg" maxlength="12">
+            </label>
+            <label>Data de nascimento *
+              <input type="date" name="data_nascimento" required>
+            </label>
+            <label>Nome do pai
+              <input type="text" name="nome_pai" maxlength="150">
+            </label>
+            <label>Nome da mãe
+              <input type="text" name="nome_mae" maxlength="150">
+            </label>
+            <div class="botoes">
+              <button type="submit">Salvar alterações</button>
+              <button type="button" id="botaoDesistir" class="secundario">Desistir</button>
+            </div>
+          </form>
+        </section>
+        <p id="msgAcao" class="mensagem" hidden></p>
+
+        <section>
+          <h3>Etapas percorridas pelo paciente</h3>
+          <ol id="listaEtapas"></ol>
+        </section>
+
+        <section class="rolagem">
+          <table>
+            <caption>Histórico de status</caption>
+            <thead>
+              <tr><th>Data e hora</th><th>De</th><th>Para</th><th>Responsável</th></tr>
+            </thead>
+            <tbody id="tabelaHistorico"></tbody>
+          </table>
+        </section>
+      </article>
+    </section>
+
+    <section class="rolagem">
+      <h2>Atendimentos recentes</h2>
+      <table>
+        <caption>Últimos 50 atendimentos (clique no número para consultar)</caption>
+        <thead>
+          <tr><th>Número</th><th>Paciente</th><th>Status</th><th>Chegada</th></tr>
+        </thead>
+        <tbody id="tabelaRecentes"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    PUC-Campinas &middot; Projeto Integrador 2 &middot; Sistema de Atendimento de Pronto Socorro &middot; 2026
+  </footer>
+
+  <script src="../javascripts/comum.js"></script>
+  <script src="../javascripts/recepcao.js"></script>
+</body>
+</html>

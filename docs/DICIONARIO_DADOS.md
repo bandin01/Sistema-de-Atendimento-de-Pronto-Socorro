@@ -1,10 +1,12 @@
 # Dicionário de Dados
 
 Banco `pronto_socorro` (MySQL 8.0.16+, InnoDB, `utf8mb4_0900_ai_ci`).
-Estado após as migrations `001`, `010`, `011`, `012` e `013`. Diagramas: [MER.md](MER.md) (conceitual) e [DER.md](DER.md) (lógico).
+Estado após os scripts `001`, `010`, `011`, `012`, `013` e `014` (pasta `banco/`). Diagramas: [MER.md](MER.md) (conceitual) e [DER.md](DER.md) (lógico).
 
 Legenda: **Nulo** `NÃO` = `NOT NULL` · **Chave** PK primária, FK estrangeira, UK única · *(s)* dado sensível com máscara por perfil na API (RNF09/RNF11).
 Todas as FKs são `ON UPDATE RESTRICT ON DELETE RESTRICT`.
+
+> **Observação:** nesta versão do sistema, "API" é o back-end em Node.js da pasta `modulos/`. Regras citadas aqui que dependiam do back-end original do repositório (login, cadastro de profissionais pela API, máscara de CPF/RG por perfil) não fazem parte desta versão simplificada; veja o `README.md`.
 
 ## Visão geral
 
@@ -14,7 +16,7 @@ Todas as FKs são `ON UPDATE RESTRICT ON DELETE RESTRICT`.
 | `recepcionistas` | Ator | Atendimento Inicial | Profissionais da recepção (perfil `RECEPCAO`). |
 | `enfermeiros` | Ator | Triagem | Equipe de enfermagem (perfil `ENFERMAGEM`). |
 | `medicos` | Ator | Consulta, Desfecho | Médicos (perfil `MEDICO`), com status operacional próprio. |
-| `atendimentos` | Etapa | Chegada + Atendimento Inicial | Abertura do atendimento na recepção, número `AT000` e status do fluxo. |
+| `atendimentos` | Etapa | Chegada + Atendimento Inicial | Abertura do atendimento na recepção, número `AT0001` e status do fluxo. |
 | `triagens` | Etapa | Triagem | Classificação de Manchester e sinais vitais. |
 | `consultas` | Etapa | Consulta | Vínculo do atendimento com o médico responsável. |
 | `desfechos` | Etapa | Desfecho/Finalização | Resultado da consulta: prescrição, exames, encaminhamento ou alta. |
@@ -22,8 +24,7 @@ Todas as FKs são `ON UPDATE RESTRICT ON DELETE RESTRICT`.
 | `historico_status` | Rastreabilidade | todas | Mudanças de status do atendimento e quem as fez. |
 | `historico_etapas` | Rastreabilidade | todas | Descrição textual de cada etapa percorrida pelo paciente. |
 | `historico_status_medico` | Rastreabilidade | — | Mudanças de status operacional do médico. |
-| `sequencia_atendimento` | Técnica | — | Gera o número sequencial do `AT000`. |
-| `schema_migrations` | Técnica | — | Controle do runner de migrations. |
+| `sequencia_atendimento` | Técnica | — | Gera o número sequencial do `AT0001`. |
 
 ## Domínios (ENUM)
 
@@ -127,7 +128,7 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | Coluna | Tipo | Nulo | Chave | Default | Descrição / regra |
 |---|---|---|---|---|---|
 | id | INT UNSIGNED | NÃO | PK | AUTO_INCREMENT | |
-| numero_atendimento | VARCHAR(12) | NÃO | UK | | `AT000`, gerado pelo trigger `trg_atendimentos_bi_numero` (RF02, RNF03). |
+| numero_atendimento | VARCHAR(12) | NÃO | UK | | `AT0001`, gerado pelo trigger `trg_atendimentos_bi_numero` (RF02, RNF03). |
 | paciente_id | INT UNSIGNED | NÃO | FK → pacientes.id | | |
 | status | ENUM status do atendimento | NÃO | | `AGUARDANDO_TRIAGEM` | Etapa em que o paciente está. Nunca indica o médico. |
 | finalizado_em | DATETIME | SIM | | | Preenchido se e só se `status = 'FINALIZADO'` (`chk_atendimentos_finalizacao`). |
@@ -233,8 +234,4 @@ Preenchida só pelos triggers `trg_medicos_ai_status` e `trg_medicos_au_status`,
 
 | Tabela | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|---|
-| `sequencia_atendimento` | id | INT UNSIGNED, PK, AUTO_INCREMENT | NÃO | Um insert por atendimento; `LAST_INSERT_ID()` vira o número do `AT000`. |
-| `schema_migrations` | versao | CHAR(3), PK | NÃO | Versão da migration (`001`, `013`…). |
-| | nome | VARCHAR(255) | NÃO | Nome do arquivo. |
-| | checksum | CHAR(64) | NÃO | SHA-256 do arquivo (impede editar migration aplicada). |
-| | aplicada_em | DATETIME | NÃO | |
+| `sequencia_atendimento` | id | INT UNSIGNED, PK, AUTO_INCREMENT | NÃO | Um insert por atendimento; `LAST_INSERT_ID()` vira o número do `AT0001`. |

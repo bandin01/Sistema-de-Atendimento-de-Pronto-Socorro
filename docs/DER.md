@@ -1,7 +1,7 @@
 # DER — Diagrama Entidade-Relacionamento (lógico, MySQL)
 
 Tabelas, colunas, chaves, nulidade e cardinalidades como estão no banco.
-Fonte: `src/db/001_schema_base.sql` + migrations `010`, `011`, `012` e `013`.
+Fonte: `banco/001_schema_base.sql` + scripts `010`, `011`, `012`, `013` e `014`.
 O modelo conceitual está em [MER.md](MER.md) e a descrição de cada coluna em [DICIONARIO_DADOS.md](DICIONARIO_DADOS.md). Imagem: [img/DER.svg](img/DER.svg) *(gerada antes da migration 013; a fonte atualizada é o diagrama Mermaid abaixo)*.
 
 Recepcionistas, médicos e enfermeiros ficam em tabelas separadas, cada uma com o próprio `login` e `senha_hash`. Não existe tabela `usuarios`: o perfil de acesso é definido pela tabela onde o profissional está.
@@ -99,7 +99,7 @@ erDiagram
 
   atendimentos {
     int_unsigned id PK "NOT NULL, AUTO_INCREMENT"
-    varchar(12) numero_atendimento UK "NOT NULL, AT000 gerado por trigger"
+    varchar(12) numero_atendimento UK "NOT NULL, AT0001 gerado por trigger"
     int_unsigned paciente_id FK "NOT NULL"
     enum status "NOT NULL: AGUARDANDO_TRIAGEM | AGUARDANDO_CONSULTA | EM_CONSULTA | FINALIZADO | CANCELADO"
     datetime criado_em "NOT NULL, chegada do paciente"
@@ -183,7 +183,7 @@ erDiagram
   }
 
   sequencia_atendimento {
-    int_unsigned id PK "NOT NULL, AUTO_INCREMENT que gera o AT000 (RNF03)"
+    int_unsigned id PK "NOT NULL, AUTO_INCREMENT que gera o AT0001 (RNF03)"
   }
 ```
 
@@ -230,7 +230,7 @@ Todas são `ON UPDATE RESTRICT ON DELETE RESTRICT`: nenhum registro clínico é 
 
 | Trigger | Regra | Requisito |
 |---|---|---|
-| trg_atendimentos_bi_numero | Gera `AT000` único sob concorrência | RF02, RNF03 |
+| trg_atendimentos_bi_numero | Gera `AT0001` único sob concorrência | RF02, RNF03 |
 | trg_atendimentos_bi_status | Todo atendimento começa `AGUARDANDO_TRIAGEM` | RF01 |
 | trg_atendimentos_bu_bloqueio | Finalizado e cancelado são imutáveis; só cancela antes da consulta; só finaliza com desfecho registrado | RF05, RF15, RNF05, RF24 |
 | trg_{recepcionistas,medicos,enfermeiros}_bi_login / _bu_login | Login não pode se repetir entre as três tabelas (procedure `sp_validar_login_unico`) | RNF08 |

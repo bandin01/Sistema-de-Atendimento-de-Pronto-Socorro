@@ -1,157 +1,183 @@
-# Sistema de Atendimento de Pronto-Socorro — Back-end
+# Sistema de Atendimento de Pronto Socorro
 
-Projeto Integrador acadêmico (Sistemas de Informação): back-end de um sistema de gestão de atendimento hospitalar, cobrindo o fluxo completo de um pronto-socorro:
+Projeto Integrador 2 — PUC-Campinas — 2026
 
-**Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho** (prescrição, exames, encaminhamento ou alta).
+Sistema web (front-end, back-end e banco de dados) que controla os atendimentos de um
+pronto-socorro, desde a chegada do paciente na recepção até a sua saída após a alta médica:
 
-> **Status:** em desenvolvimento. Banco modelado; API com autenticação, recepção (abertura, consulta, alteração e cancelamento de atendimento), cadastro de médicos e enfermagem, triagem, painel médico com consulta e desfecho, e históricos de status e de etapas. O front-end fica em repositório separado.
+1. **Recepção** — cadastro do paciente e geração do número de atendimento (ex.: `AT0001`);
+   consulta, alteração e cancelamento enquanto o atendimento não foi confirmado pelo médico.
+2. **Triagem** — a enfermagem registra pressão arterial, temperatura, batimentos cardíacos,
+   principais queixas e a classificação do protocolo de Manchester.
+3. **Atendimento médico** — Painel de Atendimento na ordem de Manchester, chamada do próximo
+   paciente (confirmação médica), registro das medicações e finalização do atendimento.
 
-## O problema que resolve
+## Tecnologias
 
-Digitaliza o fluxo de um pronto-socorro, garantindo regras de negócio críticas no back-end (não só na interface), como:
+| Parte | Tecnologia |
+|---|---|
+| Front-end | HTML5, CSS e JavaScript |
+| Back-end | Node.js com os módulos nativos `http`, `fs` e `url` + módulo `mysql2` |
+| Banco de dados | MySQL 8.0.16 ou mais novo (testado no MySQL 9.6) |
 
-- Bloqueio de alteração/cancelamento de atendimento após confirmação médica (abertura da consulta).
-- Impedimento de qualquer alteração em atendimentos já finalizados; finalização só com desfecho registrado.
-- Histórico de status do atendimento, histórico das etapas do paciente e histórico de status do médico.
-- Geração segura e sequencial do número de atendimento (`AT000`) sob concorrência.
-- Ordenação do painel médico por classificação de Manchester feita na camada de dados.
-- Controle de acesso por perfil (recepção, enfermagem, médico) validado em toda rota.
-- Mascaramento de CPF/RG nas respostas da API conforme o perfil do usuário.
-
-## Tecnologias utilizadas
-
-- Node.js
-- MySQL (driver `mysql2`)
-
-## Arquitetura
-
-Camadas simples, sem DDD tático — o domínio é linear (chegada → atendimento inicial → triagem → consulta → desfecho):
+## Estrutura de pastas
 
 ```
-/src
-  /routes         endpoints HTTP por módulo (recepção, triagem, médico)
-  /controllers    parsing de request/response, sem regra de negócio
-  /services       regras de negócio (bloqueios, validações, geração de AT000)
-  /repositories   acesso ao MySQL
-  /middlewares    autenticação, autorização por perfil, validação
-  /db             schema, triggers, migrations
+teste trabalho/
+├── servidor.js            servidor Node.js: entrega o site e responde à API
+├── modulos/               módulos do back-end (require / exports)
+│   ├── banco.js           conexão com o MySQL  ← coloque aqui a senha do seu MySQL
+│   ├── atendimentos.js    recepção: incluir, consultar, alterar, cancelar
+│   ├── triagem.js         fila e registro da triagem
+│   ├── medico.js          painel, chamar próximo, medicações, finalizar
+│   ├── profissionais.js   listas de recepcionistas, enfermeiros e médicos
+│   ├── historico.js       histórico de status e de etapas do atendimento
+│   └── utilitarios.js     funções pequenas reaproveitadas
+├── index.html             página inicial
+├── HTMLs/                 recepcao, triagem, painel_medico e consulta_medica
+├── CSSs/                  estilo.css
+├── javascripts/           comum.js + um arquivo .js para cada tela
+├── imagens/               logo.svg
+├── banco/                 scripts SQL (ver "Banco de dados")
+├── docs/                  MER, DER, dicionário de dados e requisitos
+├── package.json           dependência: mysql2
+└── node_modules/          mysql2 já instalado
 ```
 
-Regra de dependência: `routes → controllers → services → repositories`.
+## Como executar
 
-## Como executar localmente
+**Pré-requisitos:** [Node.js](https://nodejs.org) 18 ou mais novo e [MySQL](https://dev.mysql.com/downloads/) 8.0.16 ou mais novo.
 
-Pré-requisitos: [MySQL](https://dev.mysql.com/downloads/) 8.0.16+ instalado.
+1. **Criar o banco de dados.** No MySQL Workbench: *File > Open SQL Script*, abra
+   `banco/script_completo.sql` e execute (botão do raio). Pelo terminal:
 
-### Migrations (recomendado)
+   ```bash
+   mysql -u root -p < banco/script_completo.sql
+   ```
 
-Configure `DB_HOST`, `DB_PORT`, `DB_USER` e `DB_PASSWORD` no `.env` (use `127.0.0.1`, não `localhost`, no macOS) e rode:
+   O script cria o banco `pronto_socorro`, as tabelas, os triggers, os profissionais do plantão e
+   alguns pacientes de exemplo.
 
-```bash
-npm run migrate            # cria o banco se faltar e aplica só as migrations pendentes
-npm run migrate:status     # lista aplicadas e pendentes
-```
+2. **Configurar a senha do MySQL** em `modulos/banco.js` (campos `user` e `password`).
 
-O runner (`src/db/migrar.js`) aplica `src/db/NNN_*.sql` em ordem e registra cada uma na tabela `schema_migrations`. **Não apaga dados.** Para mudar o schema, crie um novo arquivo (ex.: `013_descricao.sql`) — nunca edite uma migration já aplicada (o runner detecta pelo checksum e recusa).
+3. **Instalar as dependências** (só se a pasta `node_modules` não existir):
 
-Banco criado antes do runner (pelo `recriar_banco.sh` antigo ou à mão) com as migrations 001–012? Antes de adicionar a 013, rode uma vez `npm run migrate:baseline` para marcar 001–012 como aplicadas sem reexecutá-las; depois, `npm run migrate` aplica só a 013.
+   ```bash
+   npm install
+   ```
 
-A migration `013_fluxo_etapas_consulta_desfecho.sql` converte os dados existentes (status renomeados, consultas, desfechos e etapas preenchidos). Ela falha se algum RG tiver mais de 9 caracteres: o cabeçalho do arquivo traz a consulta para conferir antes.
+4. **Iniciar o servidor**, com o terminal aberto nesta pasta:
 
-### Recriar o banco do zero
+   ```bash
+   node servidor.js
+   ```
 
-O script abaixo **apaga** o banco `pronto_socorro` e o recria do zero com a versão atual do modelo (apaga com o cliente `mysql`, pedindo a senha, e depois roda `npm run migrate`). Pede confirmação.
+5. **Abrir no navegador:** <http://localhost:3000>
 
-```bash
-./src/db/recriar_banco.sh
-```
+> Ao iniciar, o Node.js 24 mostra o aviso `DeprecationWarning: url.parse()`. É só um aviso: o
+> `url.parse` é o método ensinado em aula e funciona normalmente.
 
-Ele encontra o cliente `mysql` no PATH ou em `/usr/local/mysql/bin` (instalador oficial no macOS). Outro usuário: `MYSQL_USER=usuario ./src/db/recriar_banco.sh`.
+## Roteiro de demonstração
 
-### Manualmente (terminal ou MySQL Workbench)
+O banco já vem com 6 atendimentos: `AT0001` a `AT0003` triados (VERDE, LARANJA e AMARELO) e
+`AT0004` a `AT0006` aguardando triagem.
 
-Execute, nesta ordem:
+1. **Painel do Médico:** a fila aparece na ordem LARANJA → AMARELO → VERDE (e não na ordem de
+   chegada). A espera do LARANJA aparece em vermelho, porque passou do tempo-alvo de 10 minutos.
+2. **Recepção:** escolha a recepcionista e cadastre um paciente: o sistema gera o `AT0007`.
+   Consulte o número, altere algum dado e veja as etapas e o histórico de status.
+3. **Triagem:** escolha o(a) enfermeiro(a), clique em *Triar* no `AT0007`, preencha os sinais
+   vitais, as queixas e classifique como VERMELHO.
+4. **Painel do Médico:** o `AT0007` passa para o 1º lugar. Escolha a médica e clique em
+   *Chamar próximo paciente* (esta é a **confirmação médica**).
+5. **Recepção:** consulte o `AT0007`: alterar e cancelar não estão mais disponíveis.
+6. **Consulta médica:** registre uma medicação e finalize com um desfecho (prescrição, pedido de
+   exames, encaminhamento ou alta).
+7. **Recepção:** consulte o `AT0007` finalizado, com as 5 etapas percorridas.
 
-```bash
-mysql -u root -p < src/db/000_create_database.sql
-mysql -u root -p pronto_socorro < src/db/001_schema_base.sql
-mysql -u root -p pronto_socorro < src/db/010_recepcionistas_medicos_enfermeiros.sql
-mysql -u root -p pronto_socorro < src/db/011_integracao_atendimento_triagem_prescricao.sql
-mysql -u root -p pronto_socorro < src/db/012_historico_status.sql
-mysql -u root -p pronto_socorro < src/db/013_fluxo_etapas_consulta_desfecho.sql
-```
+### Profissionais cadastrados (`banco/dados_iniciais.sql`)
 
-Os arquivos em `src/db/legado/` são do modelo antigo e **não devem ser executados**.
-
-### Subir a API
-
-Pré-requisito extra: Node.js 18+.
-
-```bash
-npm install
-cp .env.example .env        # preencha DB_USER, DB_PASSWORD e JWT_SECRET (mínimo 32 caracteres)
-npm run seed:demo           # profissionais de desenvolvimento + 5 pacientes na fila de triagem
-npm start                   # http://localhost:3000/api
-```
-
-O seed é **só para desenvolvimento**. Senha de todos: `Plantao2026`.
-
-| Login | Perfil | Observação |
+| Perfil | Nome | Observação |
 |---|---|---|
-| `recepcao` | Recepção | Cadastra profissionais |
-| `dra.helena` | Médico | Clínica Médica (nasce de `FOLGA`; mude para `EM_PLANTAO` para chamar pacientes) |
-| `dr.rafael` | Médico | Ortopedia (idem) |
-| `enf.marina` | Enfermagem | Categoria ENFERMEIRO, pode triar |
-| `tec.joao` | Enfermagem | Categoria TECNICO_ENFERMAGEM, **não** pode triar |
+| Recepção | Ana Paula Souza, Bruno Henrique Dias | |
+| Enfermagem | Marina Lopes, Carlos Eduardo Pereira | categoria ENFERMEIRO (podem triar) |
+| Médico | Helena Martins (Clínica Médica), Rafael Costa (Ortopedia) | começam *Em plantão* |
 
-### Endpoints
+Esta versão não tem tela de login: em cada tela, o profissional responsável é escolhido em uma lista.
 
-Prefixo `/api`. Todas exigem `Authorization: Bearer <token>`, exceto o login.
+## Banco de dados
 
-| Método | Rota | Permissão | Perfis |
-|---|---|---|---|
-| POST | `/auth/login` | pública | todos |
-| GET | `/auth/sessao` | autenticado | todos |
-| POST | `/atendimentos` | `ATENDIMENTO_ABRIR` | recepção |
-| GET | `/atendimentos/:numero` | `ATENDIMENTO_CONSULTAR` | recepção, enfermagem, médico (documentos mascarados por perfil) |
-| PATCH | `/atendimentos/:numero/paciente` | `PACIENTE_ALTERAR` | recepção, só antes da confirmação médica |
-| PATCH | `/atendimentos/:numero/cancelar` | `ATENDIMENTO_CANCELAR` | recepção, só antes da confirmação médica |
-| GET | `/medicos` | `MEDICO_LISTAR` | recepção, enfermagem, médico |
-| POST | `/medicos` | `PROFISSIONAL_CADASTRAR` | recepção |
-| GET | `/medicos/me` | `MEDICO_PROPRIO_PERFIL` | médico |
-| PATCH | `/medicos/me/disponibilidade` | `MEDICO_PROPRIO_PERFIL` | médico; corpo `{ statusDisponibilidade }` com o status operacional `EM_PLANTAO`, `PAUSA`, `FOLGA` ou `LICENCA` |
-| GET | `/medicos/:id` | `MEDICO_DETALHAR` | recepção, médico |
-| PATCH | `/medicos/:id/situacao` | `PROFISSIONAL_GERENCIAR` | recepção |
-| GET, POST, PATCH | `/enfermeiros/...` | equivalentes `ENFERMEIRO_*` | mesma estrutura de `/medicos` |
-| GET | `/triagens/fila` | `TRIAGEM_VER_FILA` | enfermagem |
-| POST | `/triagens` | `TRIAGEM_REGISTRAR` | enfermagem (categoria ENFERMEIRO, disponível) |
-| GET | `/painel-medico` | `PAINEL_MEDICO_VER` | médico |
-| POST | `/painel-medico/chamar-proximo` | `ATENDIMENTO_CHAMAR_PROXIMO` | médico `EM_PLANTAO` (abre a consulta) |
-| POST | `/painel-medico/atendimentos/:id/prescricoes` | `PRESCRICAO_REGISTRAR` | médico responsável pela consulta |
-| PATCH | `/painel-medico/atendimentos/:id/finalizar` | `ATENDIMENTO_FINALIZAR` | médico responsável; corpo `{ tipoDesfecho, descricao, destinoEncaminhamento? }` |
+Os scripts da pasta `banco/` vêm do repositório do grupo e são executados nesta ordem (o
+`script_completo.sql` é a junção de todos eles):
 
-`tipoDesfecho`: `PRESCRICAO` (exige prescrição registrada), `EXAMES`, `ENCAMINHAMENTO` (exige `destinoEncaminhamento`) ou `ALTA`. A consulta do atendimento devolve `historico` (status), `etapas` (linha do tempo com descrição) e, para enfermagem e médico, `desfecho`.
+| Arquivo | Conteúdo |
+|---|---|
+| `000_create_database.sql` | cria o banco `pronto_socorro` |
+| `001_schema_base.sql` | pacientes, atendimentos (número gerado por trigger), triagens, prescrições |
+| `010_recepcionistas_medicos_enfermeiros.sql` | tabelas dos profissionais |
+| `011_integracao_atendimento_triagem_prescricao.sql` | vínculos com os profissionais e triggers |
+| `012_historico_status.sql` | histórico de status do atendimento |
+| `013_fluxo_etapas_consulta_desfecho.sql` | consultas, desfechos, histórico de etapas e do médico |
+| `014_numero_atendimento_4_digitos.sql` | número no formato `AT0001` (4 dígitos, como no descritivo) |
+| `dados_iniciais.sql` | profissionais e pacientes de exemplo |
 
-Toda falha responde `{ "erro": { "codigo", "mensagem", "detalhes"? } }`: 400 `VALIDACAO` (com todos os campos inválidos em `detalhes`), 401 `NAO_AUTENTICADO`, 403 `ACESSO_NEGADO`, 404 `NAO_ENCONTRADO`/`ROTA_NAO_ENCONTRADA`, 409 `CONFLITO`, 422 `REGRA_DE_NEGOCIO` (inclui as mensagens dos triggers). A API nunca devolve SQL nem stack trace.
+Modelo conceitual, modelo lógico e dicionário de dados: [docs/MER.md](docs/MER.md),
+[docs/DER.md](docs/DER.md) e [docs/DICIONARIO_DADOS.md](docs/DICIONARIO_DADOS.md).
 
-### Testes
+## API (back-end)
 
-Com a API no ar e o banco recém-recriado + `npm run seed:demo`:
+Todas as respostas são JSON. Em caso de erro: `{ "erro": "mensagem" }` com status 400, 404 ou 500.
 
-```bash
-npm run test:smoke     # recepção, RBAC, máscaras, validação, ordem Manchester, regras, desfecho, históricos, concorrência
-npm run test:stress    # dois médicos esvaziando a fila ao mesmo tempo
-npm run test:migracoes # runner de migrations + regras da 013 no banco (banco descartável)
-```
+| Método | Endereço | O que faz |
+|---|---|---|
+| GET | `/api/recepcionistas`, `/api/enfermeiros`, `/api/medicos` | listas de profissionais |
+| GET | `/api/atendimentos` | últimos 50 atendimentos |
+| GET | `/api/atendimentos?numero=AT0001` | consulta um atendimento (dados, etapas e histórico) |
+| POST | `/api/atendimentos` | inclui um atendimento (gera o número) |
+| POST | `/api/atendimentos/alterar` | altera os dados do paciente |
+| POST | `/api/atendimentos/cancelar` | cancela o atendimento |
+| GET | `/api/triagem/fila` | pacientes aguardando triagem |
+| POST | `/api/triagem` | registra a triagem |
+| GET | `/api/painel` | fila do médico, na ordem de Manchester |
+| POST | `/api/painel/chamar` | o médico chama o próximo paciente (confirmação médica) |
+| GET | `/api/consulta?medico=1` | consulta em andamento do médico |
+| POST | `/api/consulta/prescricao` | registra uma medicação |
+| POST | `/api/consulta/finalizar` | finaliza o atendimento com o desfecho |
 
-## Documentação
+## Regras de negócio e onde ficam
 
-- `fontes_de_verdade_sistema/requisitos.md` — requisitos funcionais (RF01–RF15) e não funcionais (RNF01–RNF09).
-- `fontes_de_verdade_sistema/guia_desenvolvimento.md` — passo a passo de implementação, fase a fase.
-- `fontes_de_verdade_sistema/requisitos_extensao_profissionais.md` — **proposta** de RF16–RF26 e RNF10–RNF14 (profissionais, fluxo em etapas, desfecho, históricos, RBAC, mascaramento), pendente de revisão do grupo.
-- `docs/MER.md` e `docs/DER.md` — modelo de dados conceitual e lógico, com diagramas.
-- `docs/DICIONARIO_DADOS.md` — dicionário de dados (cada tabela, coluna, tipo, nulidade e regra).
+| Regra | Onde |
+|---|---|
+| Número de atendimento único e sequencial, mesmo com cadastros simultâneos | trigger `trg_atendimentos_bi_numero` + tabela `sequencia_atendimento` |
+| Alterar/cancelar só antes da confirmação médica | `modulos/atendimentos.js` e trigger `trg_atendimentos_bu_bloqueio` |
+| Triagem só por enfermeiro(a) da categoria ENFERMEIRO | trigger `trg_triagens_bi_enfermeiro` |
+| Painel ordenado por Manchester no próprio banco | `ORDER BY FIELD(...)` em `modulos/medico.js` |
+| Dois médicos nunca chamam o mesmo paciente | `SELECT ... FOR UPDATE` + `UPDATE` condicional em `modulos/medico.js` |
+| Medicação só pelo médico da consulta | `modulos/medico.js` e trigger `trg_prescricoes_bi_medico` |
+| Finalização só com desfecho registrado | `modulos/medico.js` e triggers de `consultas`, `desfechos` e `atendimentos` |
+| Histórico de status (com responsável) e de etapas | `modulos/historico.js` |
+| Operações com vários passos gravam tudo ou nada | transações em `modulos/banco.js` |
 
-## Autor
+## Requisitos
 
-**Davi Bandin** — [GitHub](https://github.com/bandin01)
+| Requisito | Situação |
+|---|---|
+| RF01–RF05 (recepção) | atendidos |
+| RF06–RF08 (triagem) | atendidos |
+| RF09–RF13 (médico) | atendidos |
+| RF14 (históricos de status e de etapas) | atendido |
+| RF15 (bloqueio após a confirmação) | atendido |
+| RNF01 (painel quase em tempo real) | atualização automática a cada 10 s |
+| RNF03 (número único sob concorrência) | atendido (trigger no banco) |
+| RNF04 (integridade referencial) | atendido (chaves estrangeiras e triggers) |
+| RNF05 (bloqueio após a confirmação) | atendido |
+| RNF06 (interface própria por perfil) | atendido (uma tela por perfil) |
+| RNF08 (acesso restrito por perfil) | **não implementado** nesta versão: não há login |
+| RNF09 (acesso controlado a CPF/RG) | parcial: CPF e RG só aparecem na tela da recepção |
+
+Lista completa dos requisitos: [docs/requisitos.md](docs/requisitos.md).
+
+## Origem
+
+Modelagem do banco de dados e documentação baseadas no repositório do grupo:
+<https://github.com/bandin01/Sistema-de-Atendimento-de-Pronto-Socorro>.

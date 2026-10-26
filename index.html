@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pronto Socorro - Sistema de Atendimento</title>
+  <link rel="stylesheet" href="CSSs/estilo.css">
+  <link rel="icon" href="imagens/logo.svg">
+</head>
+<body>
+  <header>
+    <figure>
+      <img src="imagens/logo.svg" alt="Logotipo do Pronto Socorro" title="Pronto Socorro">
+    </figure>
+    <div>
+      <h1>Pronto Socorro</h1>
+      <p>Sistema de Atendimento</p>
+    </div>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="index.html" class="atual">Início</a></li>
+      <li><a href="HTMLs/recepcao.html">Recepção</a></li>
+      <li><a href="HTMLs/triagem.html">Triagem</a></li>
+      <li><a href="HTMLs/painel_medico.html">Painel do Médico</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section>
+      <h2>Bem-vindo(a)</h2>
+      <p>
+        Este sistema controla os atendimentos do pronto-socorro, desde a <strong>chegada do paciente
+        na recepção</strong> até a sua <strong>saída após a alta médica</strong>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Etapas do atendimento</h2>
+      <ol>
+        <li><strong>Recepção:</strong> cadastro do paciente e geração do número de atendimento (ex.: AT0001).
+            A recepção também consulta, altera e cancela o atendimento enquanto ele não foi confirmado pelo médico.</li>
+        <li><strong>Triagem:</strong> a enfermagem registra pressão arterial, temperatura, batimentos cardíacos,
+            principais queixas e a classificação do protocolo de Manchester.</li>
+        <li><strong>Atendimento médico:</strong> o médico acompanha o Painel de Atendimento, chama o próximo paciente,
+            registra as medicações e confirma o atendimento.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Acesse a sua área</h2>
+      <div class="areas">
+        <article>
+          <h3>Recepção</h3>
+          <p>Inclusão, consulta, alteração e cancelamento de atendimentos.</p>
+          <a href="HTMLs/recepcao.html">Abrir a Recepção</a>
+        </article>
+        <article>
+          <h3>Triagem</h3>
+          <p>Sinais vitais, queixas e classificação de risco.</p>
+          <a href="HTMLs/triagem.html">Abrir a Triagem</a>
+        </article>
+        <article>
+          <h3>Médico</h3>
+          <p>Painel de atendimentos, medicações e confirmação.</p>
+          <a href="HTMLs/painel_medico.html">Abrir o Painel do Médico</a>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <aside>
+    <section>
+      <h2>Protocolo de Manchester</h2>
+      <table>
+        <caption>Classificação de risco</caption>
+        <thead>
+          <tr><th>Cor</th><th>Prioridade</th><th>Tempo-alvo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="manchester vermelho">Vermelho</span></td><td>Emergência</td><td>Imediato</td></tr>
+          <tr><td><span class="manchester laranja">Laranja</span></td><td>Muito urgente</td><td>10 min</td></tr>
+          <tr><td><span class="manchester amarelo">Amarelo</span></td><td>Urgente</td><td>60 min</td></tr>
+          <tr><td><span class="manchester verde">Verde</span></td><td>Pouco urgente</td><td>120 min</td></tr>
+          <tr><td><span class="manchester azul">Azul</span></td><td>Não urgente</td><td>240 min</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </aside>
+
+  <footer>
+    PUC-Campinas &middot; Projeto Integrador 2 &middot; Sistema de Atendimento de Pronto Socorro &middot; 2026
+  </footer>
+</body>
+</html>

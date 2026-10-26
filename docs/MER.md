@@ -10,7 +10,7 @@ Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho/Finalizaç
                                                        └─ Alta
 ```
 
-Fonte: `src/db/001_schema_base.sql` + migrations `010`, `011`, `012` e `013`.
+Fonte: `banco/001_schema_base.sql` + scripts `010`, `011`, `012`, `013` e `014`.
 O modelo lógico (tabelas, colunas, chaves, `NOT NULL`) está em [DER.md](DER.md) e o detalhamento de cada coluna em [DICIONARIO_DADOS.md](DICIONARIO_DADOS.md). Imagens: [img/MER.svg](img/MER.svg), [img/ciclo_atendimento.svg](img/ciclo_atendimento.svg) *(geradas antes da migration 013; a fonte atualizada são os diagramas Mermaid deste arquivo)*.
 
 ## Classificação das entidades
@@ -22,13 +22,13 @@ O modelo lógico (tabelas, colunas, chaves, `NOT NULL`) está em [DER.md](DER.md
 | **Itens de etapa** | Prescrição | Detalhe do desfecho/consulta: um registro por medicamento. |
 | **Rastreabilidade** | Histórico de Status, Histórico de Etapas, Histórico de Status do Médico | Trilhas de auditoria. Nunca são alteradas pela aplicação. |
 
-**Chegada** não é uma entidade própria: é o instante em que o paciente entra no PS, gravado em `Atendimento.criado_em` e como primeira linha do Histórico de Etapas. **Atendimento** é a etapa de Atendimento Inicial (recepção, cadastro e número `AT000`) e o "envelope" que liga as etapas seguintes ao mesmo paciente.
+**Chegada** não é uma entidade própria: é o instante em que o paciente entra no PS, gravado em `Atendimento.criado_em` e como primeira linha do Histórico de Etapas. **Atendimento** é a etapa de Atendimento Inicial (recepção, cadastro e número `AT0001`) e o "envelope" que liga as etapas seguintes ao mesmo paciente.
 
 ## Fluxo do paciente
 
 ```mermaid
 flowchart LR
-  CH([Chegada]) --> AI[Atendimento Inicial<br/>recepção · AT000]
+  CH([Chegada]) --> AI[Atendimento Inicial<br/>recepção · AT0001]
   AI --> TR[Triagem<br/>enfermeiro · Manchester]
   TR --> CO[Consulta<br/>médico]
   CO --> DE{Desfecho}
@@ -127,7 +127,7 @@ O **status operacional do médico** pertence ao Médico, não ao Atendimento. `E
 
 | Entidade | Atributos |
 |---|---|
-| **Atendimento** *(Atendimento Inicial)* | <u>id</u>, numero_atendimento (AT000, único), status {AGUARDANDO_TRIAGEM, AGUARDANDO_CONSULTA, EM_CONSULTA, FINALIZADO, CANCELADO}, criado_em *(= chegada)*, finalizado_em *(opc; preenchido se e só se FINALIZADO)*, atualizado_em |
+| **Atendimento** *(Atendimento Inicial)* | <u>id</u>, numero_atendimento (AT0001, único), status {AGUARDANDO_TRIAGEM, AGUARDANDO_CONSULTA, EM_CONSULTA, FINALIZADO, CANCELADO}, criado_em *(= chegada)*, finalizado_em *(opc; preenchido se e só se FINALIZADO)*, atualizado_em |
 | **Triagem** | <u>id</u>, classificacao_manchester {VERMELHO, LARANJA, AMARELO, VERDE, AZUL}, queixa_principal, pressão sistólica/diastólica *(opc)*, frequencia_cardiaca *(opc)*, frequencia_respiratoria *(opc)*, temperatura *(opc)*, saturacao_o2 *(opc)*, glicemia *(opc)*, escala_dor *(opc)*, observacoes *(opc)*, realizada_em |
 | **Consulta** | <u>id</u>, iniciada_em *(= confirmação médica)*, finalizada_em *(opc; preenchida com o desfecho)* |
 | **Desfecho** | <u>id</u>, tipo {PRESCRICAO, EXAMES, ENCAMINHAMENTO, ALTA}, descricao, destino_encaminhamento *(opc; obrigatório só em ENCAMINHAMENTO)*, registrado_em |
@@ -164,7 +164,7 @@ Os status do Atendimento nomeiam a **etapa** em que o paciente está. Não indic
 
 ```mermaid
 stateDiagram-v2
-  [*] --> AGUARDANDO_TRIAGEM: Chegada + Atendimento Inicial (recepção gera AT000)
+  [*] --> AGUARDANDO_TRIAGEM: Chegada + Atendimento Inicial (recepção gera AT0001)
   AGUARDANDO_TRIAGEM --> AGUARDANDO_CONSULTA: Triagem (enfermeiro classifica)
   AGUARDANDO_CONSULTA --> EM_CONSULTA: Consulta (médico chama o paciente)
   EM_CONSULTA --> FINALIZADO: Desfecho (prescrição, exames, encaminhamento ou alta)

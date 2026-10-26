@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Consulta Médica - Pronto Socorro</title>
+  <link rel="stylesheet" href="../CSSs/estilo.css">
+  <link rel="icon" href="../imagens/logo.svg">
+</head>
+<body class="sem-aside">
+  <header>
+    <figure>
+      <img src="../imagens/logo.svg" alt="Logotipo do Pronto Socorro" title="Pronto Socorro">
+    </figure>
+    <div>
+      <h1>Consulta Médica</h1>
+      <p id="identificacaoMedico">Medicações e confirmação do atendimento</p>
+    </div>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="../index.html">Início</a></li>
+      <li><a href="recepcao.html">Recepção</a></li>
+      <li><a href="triagem.html">Triagem</a></li>
+      <li><a href="painel_medico.html" id="linkPainel" class="atual">Painel do Médico</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section id="semConsulta" hidden>
+      <h2>Nenhuma consulta em andamento</h2>
+      <p id="textoSemConsulta">Este(a) médico(a) não tem consulta aberta no momento.</p>
+      <p><a href="painel_medico.html" id="voltarPainel">Voltar ao Painel de Atendimento</a></p>
+    </section>
+
+    <article id="consulta" hidden>
+      <h2 id="tituloConsulta"></h2>
+
+      <section>
+        <h3>Dados do paciente e da triagem</h3>
+        <dl id="dadosConsulta"></dl>
+      </section>
+
+      <!-- MEDICAÇÕES -->
+      <section class="rolagem">
+        <h3>Medicações</h3>
+        <table>
+          <caption>Medicações prescritas nesta consulta</caption>
+          <thead>
+            <tr><th>Medicamento</th><th>Dosagem</th><th>Via</th><th>Frequência</th><th>Observações</th><th>Registrada em</th></tr>
+          </thead>
+          <tbody id="tabelaPrescricoes"></tbody>
+        </table>
+
+        <h4>Registrar medicação</h4>
+        <form id="formPrescricao">
+          <label>Medicamento *
+            <input type="text" name="medicamento" maxlength="150" placeholder="Ex.: Dipirona" required>
+          </label>
+          <label>Dosagem *
+            <input type="text" name="dosagem" maxlength="60" placeholder="Ex.: 500 mg" required>
+          </label>
+          <label>Via de administração *
+            <select name="via_administracao" required>
+              <option value="">Selecione...</option>
+              <option value="ORAL">Oral</option>
+              <option value="SUBLINGUAL">Sublingual</option>
+              <option value="INTRAVENOSA">Intravenosa</option>
+              <option value="INTRAMUSCULAR">Intramuscular</option>
+              <option value="SUBCUTANEA">Subcutânea</option>
+              <option value="INALATORIA">Inalatória</option>
+              <option value="NASAL">Nasal</option>
+              <option value="TOPICA">Tópica</option>
+              <option value="OFTALMICA">Oftálmica</option>
+              <option value="RETAL">Retal</option>
+              <option value="OUTRA">Outra</option>
+            </select>
+          </label>
+          <label>Frequência *
+            <input type="text" name="frequencia" maxlength="60" placeholder="Ex.: de 6 em 6 horas" required>
+          </label>
+          <label class="largura-total">Observações
+            <input type="text" name="observacoes" maxlength="500" placeholder="Ex.: se dor ou febre">
+          </label>
+          <div class="botoes">
+            <button type="submit">Registrar medicação</button>
+          </div>
+        </form>
+        <p id="msgPrescricao" class="mensagem" hidden></p>
+      </section>
+
+      <!-- CONFIRMAÇÃO / FINALIZAÇÃO -->
+      <section>
+        <h3>Confirmar e finalizar o atendimento</h3>
+        <form id="formFinalizar">
+          <label>Desfecho *
+            <select name="tipo" id="tipoDesfecho" required>
+              <option value="">Selecione...</option>
+              <option value="PRESCRICAO">Prescrição (alta com receita)</option>
+              <option value="EXAMES">Pedido de exames</option>
+              <option value="ENCAMINHAMENTO">Encaminhamento</option>
+              <option value="ALTA">Alta</option>
+            </select>
+          </label>
+          <label id="campoDestino" hidden>Encaminhar para *
+            <input type="text" name="destino_encaminhamento" maxlength="150" placeholder="Ex.: Cardiologia - Hospital X">
+          </label>
+          <label class="largura-total">Conduta / orientações *
+            <textarea name="descricao" maxlength="500" required
+                      placeholder="Ex.: repouso, hidratação e retorno se a febre persistir"></textarea>
+          </label>
+          <div class="botoes">
+            <button type="submit">Confirmar e finalizar atendimento</button>
+          </div>
+        </form>
+        <p id="msgFinalizar" class="mensagem" hidden></p>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    PUC-Campinas &middot; Projeto Integrador 2 &middot; Sistema de Atendimento de Pronto Socorro &middot; 2026
+  </footer>
+
+  <script src="../javascripts/comum.js"></script>
+  <script src="../javascripts/consulta_medica.js"></script>
+</body>
+</html>
