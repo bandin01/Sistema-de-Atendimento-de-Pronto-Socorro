@@ -182,7 +182,9 @@ exports.abrir = function (dados, callback) {
 };
 
 // CONSULTA (RF03): dados do paciente, situação e histórico do atendimento.
-exports.consultar = function (numero, callback) {
+// CPF e RG só vão completos para a recepção, que cadastra e altera o paciente;
+// para os outros perfis eles vão mascarados (RNF09).
+exports.consultar = function (numero, perfil, callback) {
   numero = util.numeroAtendimento(numero);
   let sql = 'SELECT a.id, a.numero_atendimento, a.status, a.criado_em, a.finalizado_em, ' +
             'p.nome, p.endereco, p.cpf, p.rg, p.nome_pai, p.nome_mae, p.data_nascimento, ' +
@@ -201,6 +203,11 @@ exports.consultar = function (numero, callback) {
     }
     let atendimento = linhas[0];
     atendimento.pode_alterar = statusAlteraveis.indexOf(atendimento.status) != -1;
+    if (perfil != 'RECEPCAO') {
+      atendimento.cpf = util.mascararCpf(atendimento.cpf);
+      atendimento.rg = util.mascararRg(atendimento.rg);
+      atendimento.pode_alterar = false;
+    }
 
     let sqlEtapas = 'SELECT etapa, descricao, registrado_em FROM historico_etapas ' +
                     'WHERE atendimento_id = ? ORDER BY registrado_em, id';

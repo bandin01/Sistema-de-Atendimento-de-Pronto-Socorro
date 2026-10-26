@@ -13,69 +13,127 @@ let atendimentos = require('./modulos/atendimentos');
 let triagem = require('./modulos/triagem');
 let medico = require('./modulos/medico');
 let profissionais = require('./modulos/profissionais');
+let sessoes = require('./modulos/sessoes');
 
-let porta = 3000;
+// A porta pode ser trocada pela variável de ambiente PORTA (usada nos testes).
+let porta = process.env.PORTA || 3000;
 
 // ---------------------------------------------------------------------------
 // API: cada rota é "MÉTODO /caminho" e aponta para uma função.
-// "consulta" são os parâmetros da URL (?numero=AT0001) e "dados" é o JSON
-// enviado pelo navegador no corpo da requisição.
+// "consulta" são os parâmetros da URL (?numero=AT0001), "dados" é o JSON
+// enviado pelo navegador no corpo da requisição e "sessao" é quem está
+// usando o sistema: { perfil, id, nome } (ou null nas rotas públicas).
+//
+// CONTROLE DE ACESSO (RNF08): permissoes[rota] lista os perfis que podem usar
+// a rota. Rota sem permissões é pública (só as da página inicial).
+// O profissional responsável vem sempre da sessão, nunca do formulário:
+// assim ninguém registra uma ação em nome de outra pessoa.
 // ---------------------------------------------------------------------------
 let rotas = [];
+let permissoes = [];
 
-// Profissionais (listas para os campos "Profissional responsável")
-rotas['GET /api/recepcionistas'] = function (consulta, dados, callback) {
+let RECEPCAO = 'RECEPCAO';
+let ENFERMAGEM = 'ENFERMAGEM';
+let MEDICO = 'MEDICO';
+
+// Sessão: entrar, ver quem está logado e sair
+rotas['POST /api/entrar'] = function (consulta, dados, sessao, callback) {
+  sessoes.entrar(dados, callback);
+};
+rotas['GET /api/sessao'] = function (consulta, dados, sessao, callback) {
+  callback(null, { perfil: sessao.perfil, id: sessao.id, nome: sessao.nome });
+};
+permissoes['GET /api/sessao'] = [RECEPCAO, ENFERMAGEM, MEDICO];
+rotas['POST /api/sair'] = function (consulta, dados, sessao, callback, token) {
+  sessoes.sair(token);
+  callback(null, { saiu: true });
+};
+permissoes['POST /api/sair'] = [RECEPCAO, ENFERMAGEM, MEDICO];
+
+// Profissionais (listas para a escolha do profissional na página inicial).
+// São públicas porque não trazem dados sensíveis: só id, nome e registro.
+rotas['GET /api/recepcionistas'] = function (consulta, dados, sessao, callback) {
   profissionais.recepcionistas(callback);
 };
-rotas['GET /api/enfermeiros'] = function (consulta, dados, callback) {
+rotas['GET /api/enfermeiros'] = function (consulta, dados, sessao, callback) {
   profissionais.enfermeiros(callback);
 };
-rotas['GET /api/medicos'] = function (consulta, dados, callback) {
+rotas['GET /api/medicos'] = function (consulta, dados, sessao, callback) {
   profissionais.medicos(callback);
 };
 
-// Recepção
-rotas['GET /api/atendimentos'] = function (consulta, dados, callback) {
+// Recepção. A consulta de UM atendimento é liberada para os três perfis, mas
+// CPF e RG só vão completos para a recepção (RNF09). A lista dos últimos
+// atendimentos é só da recepção.
+rotas['GET /api/atendimentos'] = function (consulta, dados, sessao, callback) {
   if (consulta.numero) {
-    atendimentos.consultar(consulta.numero, callback);   // consulta de um atendimento
+    atendimentos.consultar(consulta.numero, sessao.perfil, callback);   // consulta de um atendimento
+  } else if (sessao.perfil == RECEPCAO) {
+    atendimentos.listar(callback);                                       // últimos atendimentos
   } else {
-    atendimentos.listar(callback);                         // últimos atendimentos
+    callback(acessoNegado([RECEPCAO]));
   }
 };
-rotas['POST /api/atendimentos'] = function (consulta, dados, callback) {
+permissoes['GET /api/atendimentos'] = [RECEPCAO, ENFERMAGEM, MEDICO];
+rotas['POST /api/atendimentos'] = function (consulta, dados, sessao, callback) {
+  dados.recepcionista_id = sessao.id;
   atendimentos.abrir(dados, callback);
 };
-rotas['POST /api/atendimentos/alterar'] = function (consulta, dados, callback) {
+permissoes['POST /api/atendimentos'] = [RECEPCAO];
+rotas['POST /api/atendimentos/alterar'] = function (consulta, dados, sessao, callback) {
   atendimentos.alterar(dados, callback);
 };
-rotas['POST /api/atendimentos/cancelar'] = function (consulta, dados, callback) {
+permissoes['POST /api/atendimentos/alterar'] = [RECEPCAO];
+rotas['POST /api/atendimentos/cancelar'] = function (consulta, dados, sessao, callback) {
+  dados.recepcionista_id = sessao.id;
   atendimentos.cancelar(dados, callback);
 };
+permissoes['POST /api/atendimentos/cancelar'] = [RECEPCAO];
 
-// Triagem
-rotas['GET /api/triagem/fila'] = function (consulta, dados, callback) {
+// Triagem: só a enfermagem
+rotas['GET /api/triagem/fila'] = function (consulta, dados, sessao, callback) {
   triagem.fila(callback);
 };
-rotas['POST /api/triagem'] = function (consulta, dados, callback) {
+permissoes['GET /api/triagem/fila'] = [ENFERMAGEM];
+rotas['POST /api/triagem'] = function (consulta, dados, sessao, callback) {
+  dados.enfermeiro_id = sessao.id;
   triagem.registrar(dados, callback);
 };
+permissoes['POST /api/triagem'] = [ENFERMAGEM];
 
-// Médico
-rotas['GET /api/painel'] = function (consulta, dados, callback) {
+// Médico: só o médico
+rotas['GET /api/painel'] = function (consulta, dados, sessao, callback) {
   medico.painel(callback);
 };
-rotas['POST /api/painel/chamar'] = function (consulta, dados, callback) {
+permissoes['GET /api/painel'] = [MEDICO];
+rotas['POST /api/painel/chamar'] = function (consulta, dados, sessao, callback) {
+  dados.medico_id = sessao.id;
   medico.chamarProximo(dados, callback);
 };
-rotas['GET /api/consulta'] = function (consulta, dados, callback) {
-  medico.consultaAberta(consulta.medico, callback);
+permissoes['POST /api/painel/chamar'] = [MEDICO];
+rotas['GET /api/consulta'] = function (consulta, dados, sessao, callback) {
+  medico.consultaAberta(sessao.id, callback);
 };
-rotas['POST /api/consulta/prescricao'] = function (consulta, dados, callback) {
+permissoes['GET /api/consulta'] = [MEDICO];
+rotas['POST /api/consulta/prescricao'] = function (consulta, dados, sessao, callback) {
+  dados.medico_id = sessao.id;
   medico.registrarPrescricao(dados, callback);
 };
-rotas['POST /api/consulta/finalizar'] = function (consulta, dados, callback) {
+permissoes['POST /api/consulta/prescricao'] = [MEDICO];
+rotas['POST /api/consulta/finalizar'] = function (consulta, dados, sessao, callback) {
+  dados.medico_id = sessao.id;
   medico.finalizar(dados, callback);
 };
+permissoes['POST /api/consulta/finalizar'] = [MEDICO];
+
+// Erro 403 com os perfis que poderiam usar a função.
+function acessoNegado(perfis) {
+  let nomes = [];
+  for (let i = 0; i < perfis.length; i++) {
+    nomes.push(sessoes.nomePerfil(perfis[i]));
+  }
+  return { status: 403, mensagem: 'Acesso negado: esta função é exclusiva do perfil ' + nomes.join(' / ') + '.' };
+}
 
 // Lê o corpo da requisição (o JSON enviado pelo navegador) e o converte em objeto.
 function lerCorpo(req, callback) {
@@ -87,11 +145,16 @@ function lerCorpo(req, callback) {
     if (corpo == '') {
       return callback(null, {});
     }
+    let dados;
     try {
-      callback(null, JSON.parse(corpo));
+      dados = JSON.parse(corpo);
     } catch (e) {
-      callback({ status: 400, mensagem: 'Os dados enviados não estão no formato JSON.' });
+      return callback({ status: 400, mensagem: 'Os dados enviados não estão no formato JSON.' });
     }
+    if (dados === null || typeof dados != 'object') {
+      return callback({ status: 400, mensagem: 'Os dados enviados devem ser um objeto JSON.' });
+    }
+    callback(null, dados);
   });
 }
 
@@ -141,13 +204,26 @@ function tratarApi(req, res, endereco) {
   if (rota === undefined) {
     return responder(res, { status: 404, mensagem: 'Endereço da API não encontrado.' });
   }
+  // Confere quem está chamando e se o perfil dele pode usar esta rota.
+  let token = req.headers['x-sessao'];
+  let sessao = null;
+  let perfis = permissoes[req.method + ' ' + endereco.pathname];
+  if (perfis !== undefined) {
+    sessao = sessoes.identificar(token);
+    if (sessao == null) {
+      return responder(res, { status: 401, mensagem: 'Sessão expirada ou inexistente. Entre novamente pela página inicial.' });
+    }
+    if (perfis.indexOf(sessao.perfil) == -1) {
+      return responder(res, acessoNegado(perfis));
+    }
+  }
   lerCorpo(req, function (err, dados) {
     if (err) {
       return responder(res, err);
     }
-    rota(endereco.query, dados, function (err, resultado) {
+    rota(endereco.query, dados, sessao, function (err, resultado) {
       responder(res, err, resultado);
-    });
+    }, token);
   });
 }
 

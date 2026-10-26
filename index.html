@@ -37,6 +37,35 @@
     </section>
 
     <section>
+      <h2>Entrar no sistema</h2>
+      <!-- Mostrado para quem ainda não entrou -->
+      <form id="formEntrar" class="linha" hidden>
+        <label>Perfil
+          <select name="perfil" id="perfil" required>
+            <option value="">Selecione...</option>
+            <option value="RECEPCAO">Recepção</option>
+            <option value="ENFERMAGEM">Enfermagem</option>
+            <option value="MEDICO">Médico</option>
+          </select>
+        </label>
+        <label>Profissional
+          <select name="profissional_id" id="profissional" required>
+            <option value="">Escolha antes o perfil</option>
+          </select>
+        </label>
+        <button type="submit">Entrar</button>
+      </form>
+      <!-- Mostrado para quem já entrou -->
+      <div id="jaEntrou" hidden>
+        <p id="usuarioLogado"></p>
+        <p><a id="linkMinhaArea" href="index.html">Abrir a minha área</a></p>
+      </div>
+      <p id="msgEntrar" class="mensagem" hidden></p>
+      <p><small>Cada perfil só acessa as funções da sua etapa: a recepção cadastra, a enfermagem tria e o
+         médico atende. Cada aba do navegador tem a sua própria sessão.</small></p>
+    </section>
+
+    <section>
       <h2>Etapas do atendimento</h2>
       <ol>
         <li><strong>Recepção:</strong> cadastro do paciente e geração do número de atendimento (ex.: AT0001).
@@ -92,5 +121,8 @@
   <footer>
     PUC-Campinas &middot; Projeto Integrador 2 &middot; Sistema de Atendimento de Pronto Socorro &middot; 2026
   </footer>
+
+  <script src="javascripts/comum.js"></script>
+  <script src="javascripts/inicio.js"></script>
 </body>
 </html>

@@ -1,14 +1,12 @@
 // Tela da RECEPÇÃO: inclusão, consulta, alteração e cancelamento do atendimento.
 
+// A recepcionista responsável é quem entrou no sistema: o servidor a
+// identifica pela sessão.
+
 let atendimentoAtual = null;   // atendimento que está aparecendo na consulta
 
-carregarProfissionais('/api/recepcionistas', 'recepcionista', function (recepcionista) {
-  return recepcionista.nome;
-});
-carregarRecentes();
-
-function recepcionistaSelecionada() {
-  return elemento('recepcionista').value;
+if (exigirPerfil('RECEPCAO')) {
+  carregarRecentes();
 }
 
 // "12345678909" → "123.456.789-09"
@@ -24,12 +22,7 @@ function formatarCpf(cpf) {
 // ---------------------------------------------------------------------------
 elemento('formNovo').onsubmit = function (evento) {
   evento.preventDefault();
-  if (recepcionistaSelecionada() == '') {
-    mostrarMensagem('msgNovo', 'Selecione a recepcionista responsável, no topo da página.', 'erro');
-    return;
-  }
   let dados = dadosDoFormulario(elemento('formNovo'));
-  dados.recepcionista_id = recepcionistaSelecionada();
 
   chamarApi('POST', '/api/atendimentos', dados, function (erro, resposta) {
     if (erro) {
@@ -163,18 +156,13 @@ elemento('formAlterar').onsubmit = function (evento) {
 // CANCELAMENTO
 // ---------------------------------------------------------------------------
 elemento('botaoCancelar').onclick = function () {
-  if (recepcionistaSelecionada() == '') {
-    mostrarMensagem('msgAcao', 'Selecione a recepcionista responsável, no topo da página.', 'erro');
-    return;
-  }
   let confirmou = confirm('Deseja realmente cancelar o atendimento ' + atendimentoAtual.numero_atendimento +
                           ' de ' + atendimentoAtual.nome + '?');
   if (confirmou == false) {
     return;
   }
   let dados = {
-    numero_atendimento: atendimentoAtual.numero_atendimento,
-    recepcionista_id: recepcionistaSelecionada()
+    numero_atendimento: atendimentoAtual.numero_atendimento
   };
   chamarApi('POST', '/api/atendimentos/cancelar', dados, function (erro) {
     if (erro) {

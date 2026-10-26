@@ -4,9 +4,10 @@
 -- Profissionais do plantão e alguns pacientes de exemplo para demonstração.
 -- Executar DEPOIS dos scripts 000 a 014.
 --
--- Observação: o sistema não tem tela de login (o back-end foi simplificado).
--- As colunas login e senha_hash fazem parte da modelagem original do banco e
--- são obrigatórias, por isso são preenchidas com valores fixos.
+-- Observação: o profissional entra no sistema escolhendo o perfil e o nome na
+-- página inicial (sem senha). As colunas login e senha_hash fazem parte da
+-- modelagem original do banco e são obrigatórias, por isso são preenchidas
+-- com valores fixos.
 -- =============================================================================
 
 USE pronto_socorro;

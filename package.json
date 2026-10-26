@@ -4,7 +4,8 @@
   "description": "Sistema de Atendimento de Pronto Socorro - Projeto Integrador 2 (PUC-Campinas)",
   "main": "servidor.js",
   "scripts": {
-    "start": "node servidor.js"
+    "start": "node servidor.js",
+    "test": "node --test testes/*.test.js"
   },
   "dependencies": {
     "mysql2": "3.11.0"

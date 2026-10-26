@@ -1,38 +1,25 @@
 // Tela do PAINEL DO MÉDICO: sequência de atendimento pela classificação de
 // Manchester e chamada do próximo paciente.
 
-carregarProfissionais('/api/medicos', 'medico', function (medico) {
-  return medico.nome + ' – ' + medico.especialidade;
-}, function () {
-  // Volta da tela de consulta com o médico já escolhido: painel_medico.html?medico=1
-  let escolhido = lerParametro('medico');
-  if (escolhido != '') {
-    elemento('medico').value = escolhido;
-  }
+// O(a) médico(a) responsável é quem entrou no sistema.
+if (exigirPerfil('MEDICO')) {
   mostrarSituacao();
-});
-carregarPainel();
-setInterval(carregarPainel, 10000);   // atualiza o painel a cada 10 segundos (RNF01)
-
-elemento('medico').onchange = mostrarSituacao;
+  carregarPainel();
+  setInterval(carregarPainel, 10000);   // atualiza o painel a cada 10 segundos (RNF01)
+}
 
 // Mostra a situação do médico e, se ele já tiver uma consulta aberta, o link para continuar.
 function mostrarSituacao() {
-  let medicoId = elemento('medico').value;
   mostrarMensagem('msgPainel', '', '');
   elemento('botaoChamar').disabled = false;
-  if (medicoId == '') {
-    elemento('situacaoMedico').innerHTML = '';
-    return;
-  }
-  chamarApi('GET', '/api/consulta?medico=' + medicoId, null, function (erro, resposta) {
+  chamarApi('GET', '/api/consulta', null, function (erro, resposta) {
     if (erro) {
       mostrarMensagem('msgPainel', erro, 'erro');
       return;
     }
     let texto = 'Situação: <span class="status">' + nomesStatus[resposta.medico.status_operacional] + '</span>';
     if (resposta.consulta) {
-      texto += ' &nbsp; Consulta em andamento: <a href="consulta_medica.html?medico=' + medicoId + '">' +
+      texto += ' &nbsp; Consulta em andamento: <a href="consulta_medica.html">' +
                protegerTexto(resposta.consulta.numero_atendimento) + ' – ' + protegerTexto(resposta.consulta.nome) +
                ' (continuar)</a>';
       elemento('botaoChamar').disabled = true;
@@ -43,18 +30,13 @@ function mostrarSituacao() {
 
 // CHAMAR PRÓXIMO: o sistema entrega ao médico o paciente de maior prioridade.
 elemento('botaoChamar').onclick = function () {
-  let medicoId = elemento('medico').value;
-  if (medicoId == '') {
-    mostrarMensagem('msgPainel', 'Selecione o(a) médico(a).', 'erro');
-    return;
-  }
-  chamarApi('POST', '/api/painel/chamar', { medico_id: medicoId }, function (erro) {
+  chamarApi('POST', '/api/painel/chamar', {}, function (erro) {
     if (erro) {
       mostrarMensagem('msgPainel', erro, 'erro');
       carregarPainel();
       return;
     }
-    location.href = 'consulta_medica.html?medico=' + medicoId;
+    location.href = 'consulta_medica.html';
   });
 };
 

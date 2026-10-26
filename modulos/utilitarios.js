@@ -47,3 +47,22 @@ exports.dataValida = function (valor) {
   }
   return ano >= 1890 && data <= new Date();
 };
+
+// MASCARAMENTO (RNF09): esconde a maior parte do CPF e do RG para quem não
+// precisa deles por completo. Valor vazio continua vazio.
+// "52998224725" → "***.***.*47-25"
+exports.mascararCpf = function (cpf) {
+  if (!cpf) {
+    return cpf;
+  }
+  return '***.***.*' + cpf.slice(7, 9) + '-' + cpf.slice(9);
+};
+
+// "284731905" → "*****1905" (ficam só os 4 últimos caracteres)
+exports.mascararRg = function (rg) {
+  if (!rg) {
+    return rg;
+  }
+  let fim = rg.slice(-4);
+  return '*'.repeat(rg.length - fim.length) + fim;
+};

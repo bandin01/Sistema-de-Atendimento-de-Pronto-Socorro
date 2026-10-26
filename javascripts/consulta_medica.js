@@ -1,14 +1,12 @@
 // Tela da CONSULTA MÉDICA: o médico vê os dados do paciente e da triagem,
 // registra as medicações e confirma (finaliza) o atendimento.
-// O médico vem no endereço da página: consulta_medica.html?medico=1
+// O médico é quem entrou no sistema: o servidor o identifica pela sessão.
 
-let medicoId = lerParametro('medico');
 let consultaAtual = null;
 
-elemento('linkPainel').href = 'painel_medico.html?medico=' + medicoId;
-elemento('voltarPainel').href = 'painel_medico.html?medico=' + medicoId;
-
-carregarConsulta();
+if (exigirPerfil('MEDICO')) {
+  carregarConsulta();
+}
 
 function semConsulta(texto) {
   elemento('textoSemConsulta').textContent = texto;
@@ -17,11 +15,7 @@ function semConsulta(texto) {
 }
 
 function carregarConsulta() {
-  if (medicoId == '') {
-    semConsulta('Escolha o(a) médico(a) no Painel de Atendimento e clique em "Chamar próximo paciente".');
-    return;
-  }
-  chamarApi('GET', '/api/consulta?medico=' + encodeURIComponent(medicoId), null, function (erro, resposta) {
+  chamarApi('GET', '/api/consulta', null, function (erro, resposta) {
     if (erro) {
       semConsulta(erro);
       return;
@@ -30,7 +24,7 @@ function carregarConsulta() {
     elemento('identificacaoMedico').textContent = m.nome + ' – ' + m.especialidade +
                                                   ' (CRM-' + m.crm_uf + ' ' + m.crm_numero + ')';
     if (resposta.consulta == null) {
-      semConsulta('Este(a) médico(a) não tem consulta aberta no momento.');
+      semConsulta('Você não tem consulta aberta no momento. Volte ao painel e clique em "Chamar próximo paciente".');
       return;
     }
     consultaAtual = resposta.consulta;
@@ -82,7 +76,6 @@ function mostrarConsulta(c, prescricoes) {
 elemento('formPrescricao').onsubmit = function (evento) {
   evento.preventDefault();
   let dados = dadosDoFormulario(elemento('formPrescricao'));
-  dados.medico_id = medicoId;
   dados.numero_atendimento = consultaAtual.numero_atendimento;
 
   chamarApi('POST', '/api/consulta/prescricao', dados, function (erro) {
@@ -114,7 +107,6 @@ elemento('formFinalizar').onsubmit = function (evento) {
     return;
   }
   let dados = dadosDoFormulario(elemento('formFinalizar'));
-  dados.medico_id = medicoId;
   dados.numero_atendimento = consultaAtual.numero_atendimento;
 
   chamarApi('POST', '/api/consulta/finalizar', dados, function (erro) {
@@ -123,6 +115,6 @@ elemento('formFinalizar').onsubmit = function (evento) {
       return;
     }
     alert('Atendimento ' + consultaAtual.numero_atendimento + ' finalizado com sucesso.');
-    location.href = 'painel_medico.html?medico=' + medicoId;
+    location.href = 'painel_medico.html';
   });
 };

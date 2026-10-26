@@ -23,15 +23,20 @@
       <li><a href="../index.html">Início</a></li>
       <li><a href="recepcao.html">Recepção</a></li>
       <li><a href="triagem.html">Triagem</a></li>
-      <li><a href="painel_medico.html" id="linkPainel" class="atual">Painel do Médico</a></li>
+      <li><a href="painel_medico.html" class="atual">Painel do Médico</a></li>
     </ul>
   </nav>
 
   <main>
+    <section>
+      <h2>Médico(a) responsável</h2>
+      <p id="usuarioLogado"></p>
+    </section>
+
     <section id="semConsulta" hidden>
       <h2>Nenhuma consulta em andamento</h2>
       <p id="textoSemConsulta">Este(a) médico(a) não tem consulta aberta no momento.</p>
-      <p><a href="painel_medico.html" id="voltarPainel">Voltar ao Painel de Atendimento</a></p>
+      <p><a href="painel_medico.html">Voltar ao Painel de Atendimento</a></p>
     </section>
 
     <article id="consulta" hidden>

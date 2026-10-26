@@ -4,11 +4,11 @@
 let filaAtual = [];          // pacientes que estão na tabela da fila
 let numeroEmTriagem = '';    // atendimento aberto no formulário
 
-carregarProfissionais('/api/enfermeiros', 'enfermeiro', function (enfermeiro) {
-  return enfermeiro.nome + ' (COREN-' + enfermeiro.coren_uf + ' ' + enfermeiro.coren_numero + ')';
-});
-carregarFila();
-setInterval(carregarFila, 15000);   // atualiza a fila a cada 15 segundos
+// O(a) enfermeiro(a) responsável é quem entrou no sistema.
+if (exigirPerfil('ENFERMAGEM')) {
+  carregarFila();
+  setInterval(carregarFila, 15000);   // atualiza a fila a cada 15 segundos
+}
 
 function carregarFila() {
   chamarApi('GET', '/api/triagem/fila', null, function (erro, fila) {
@@ -75,10 +75,6 @@ function montarQueixas() {
 
 elemento('formTriagem').onsubmit = function (evento) {
   evento.preventDefault();
-  if (elemento('enfermeiro').value == '') {
-    mostrarMensagem('msgFormulario', 'Selecione o(a) enfermeiro(a) responsável, no topo da página.', 'erro');
-    return;
-  }
   let dados = dadosDoFormulario(elemento('formTriagem'));
   dados.queixa_principal = montarQueixas();
   if (dados.queixa_principal == '') {
@@ -86,7 +82,6 @@ elemento('formTriagem').onsubmit = function (evento) {
     return;
   }
   dados.numero_atendimento = numeroEmTriagem;
-  dados.enfermeiro_id = elemento('enfermeiro').value;
 
   chamarApi('POST', '/api/triagem', dados, function (erro) {
     if (erro) {

@@ -29,17 +29,21 @@ modulos/           back-end — regras de negócio e acesso ao MySQL
   medico.js        painel, chamar próximo, prescrições, finalizar com desfecho
   profissionais.js listas de recepcionistas, enfermeiros e médicos
   historico.js     histórico de status e de etapas
+  sessoes.js       entrada no sistema (perfil + profissional, sem senha) e sessões em memória
   utilitarios.js   funções pequenas reaproveitadas (erro, texto, numeroAtendimento…)
-index.html         página inicial
+index.html         página inicial (entrada no sistema)
 HTMLs/             telas: recepcao, triagem, painel_medico, consulta_medica
-javascripts/       comum.js + um .js por tela (chamadas à API e manipulação do DOM)
+javascripts/       comum.js (chamarApi, sessão, exigirPerfil) + inicio.js + um .js por tela
 CSSs/estilo.css    estilos
 imagens/           logo
 banco/             scripts SQL numerados + dados_iniciais.sql + script_completo.sql (tudo junto)
 docs/              MER, DER, dicionário de dados, requisitos, imagens dos diagramas
+testes/            testes com node:test e banco falso (npm test, não precisa do MySQL)
 ```
 
-Regra de negócio vive em `modulos/` (back-end), nunca só no front-end. O `servidor.js` só roteia: cada rota chama uma função de um módulo, que devolve `callback(erro, resultado)`, com erros criados por `util.erro(status, mensagem)`.
+Regra de negócio vive em `modulos/` (back-end), nunca só no front-end. O `servidor.js` só roteia: cada rota recebe `(consulta, dados, sessao, callback)` e chama uma função de um módulo, que devolve `callback(erro, resultado)`, com erros criados por `util.erro(status, mensagem)`.
+
+Toda rota nova precisa de uma linha `permissoes['MÉTODO /caminho'] = [perfis]` em `servidor.js` (sem ela a rota fica pública) e de uma linha na lista `rotasProtegidas` de `testes/acesso.test.js`. O profissional responsável vem sempre de `sessao.id`, nunca do corpo da requisição. No front-end, cada tela chama `exigirPerfil('PERFIL')` antes de carregar dados.
 
 Ao mudar o banco, crie um novo script numerado em `banco/` **e** atualize `banco/script_completo.sql` e a documentação em `docs/`.
 
@@ -49,6 +53,7 @@ Ao mudar o banco, crie um novo script numerado em `banco/` **e** atualize `banco
 mysql -u root -p < banco/script_completo.sql   # cria o banco com dados de exemplo
 npm install                                     # se não houver node_modules
 node servidor.js                                # http://localhost:3000
+npm test                                        # testes de controle de acesso
 ```
 
 ## Regras de negócio inegociáveis (validar sempre no back-end)
@@ -60,8 +65,8 @@ node servidor.js                                # http://localhost:3000
 - Número de atendimento (`AT0001`) único e sequencial, seguro sob concorrência (RNF03) — via `AUTO_INCREMENT` + trigger no MySQL.
 - Painel médico ordenado por classificação de Manchester na query SQL (`ORDER BY FIELD(...)`), nunca só no front-end (RF09).
 - Operações concorrentes (alterar, cancelar, chamar próximo, finalizar) dentro de transação com `SELECT ... FOR UPDATE`.
-
-Pendentes em relação aos requisitos (ainda não implementados nesta versão): controle de acesso por perfil validado nas rotas (RNF08) e mascaramento de CPF/RG nas respostas da API (RNF09).
+- Acesso por perfil (recepção, enfermagem, médico) validado em toda rota da API, não só na UI (RNF08). A entrada é por escolha de perfil + profissional, sem senha (decisão do grupo).
+- CPF/RG completos só para a recepção; mascarados para os outros perfis (RNF09).
 
 ## Fluxo de trabalho
 
