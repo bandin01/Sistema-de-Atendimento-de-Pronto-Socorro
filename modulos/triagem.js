@@ -16,6 +16,44 @@ exports.fila = function (callback) {
   banco.executar(sql, [], callback);
 };
 
+// SITUAÇÃO DO(A) ENFERMEIRO(A): disponível, em pausa ou indisponível.
+// Só quem está DISPONIVEL registra triagem.
+let situacoesEnfermagem = ['DISPONIVEL', 'PAUSA', 'INDISPONIVEL'];
+
+exports.situacao = function (enfermeiroId, callback) {
+  let sql = 'SELECT status_disponibilidade FROM enfermeiros WHERE id = ? AND ativo = 1';
+  banco.executar(sql, [enfermeiroId], function (err, linhas) {
+    if (err) {
+      return callback(err);
+    }
+    if (linhas.length == 0) {
+      return callback(util.erro(404, 'Enfermeiro(a) não encontrado(a).'));
+    }
+    callback(null, { status_disponibilidade: linhas[0].status_disponibilidade });
+  });
+};
+
+exports.alterarSituacao = function (dados, callback) {
+  let enfermeiroId = parseInt(dados.enfermeiro_id, 10);
+  let situacao = util.texto(dados.status_disponibilidade).toUpperCase();
+  if (isNaN(enfermeiroId)) {
+    return callback(util.erro(400, 'Selecione o(a) enfermeiro(a) responsável.'));
+  }
+  if (situacoesEnfermagem.indexOf(situacao) == -1) {
+    return callback(util.erro(400, 'Escolha a situação: disponível, em pausa ou indisponível.'));
+  }
+  let sql = 'UPDATE enfermeiros SET status_disponibilidade = ? WHERE id = ? AND ativo = 1';
+  banco.executar(sql, [situacao, enfermeiroId], function (err, resultado) {
+    if (err) {
+      return callback(err);
+    }
+    if (resultado.affectedRows == 0) {
+      return callback(util.erro(404, 'Enfermeiro(a) não encontrado(a).'));
+    }
+    callback(null, { status_disponibilidade: situacao });
+  });
+};
+
 // Lê e valida os dados da triagem. Devolve { triagem, problema }.
 function lerTriagem(dados) {
   let triagem = {
@@ -60,8 +98,9 @@ exports.registrar = function (dados, callback) {
   let triagem = lido.triagem;
 
   banco.transacao(function (conexao, concluir) {
-    let sql = 'SELECT a.id, a.status, (SELECT e.nome FROM enfermeiros e WHERE e.id = ?) AS enfermeiro ' +
-              'FROM atendimentos a WHERE a.numero_atendimento = ? FOR UPDATE';
+    let sql = 'SELECT a.id, a.status, e.nome AS enfermeiro, e.status_disponibilidade ' +
+              'FROM atendimentos a LEFT JOIN enfermeiros e ON e.id = ? ' +
+              'WHERE a.numero_atendimento = ? FOR UPDATE OF a';
     conexao.query(sql, [enfermeiroId, numero], function (err, linhas) {
       if (err) {
         return concluir(err);
@@ -72,6 +111,9 @@ exports.registrar = function (dados, callback) {
       let atendimento = linhas[0];
       if (atendimento.status != 'AGUARDANDO_TRIAGEM') {
         return concluir(util.erro(400, 'O atendimento ' + numero + ' não está aguardando triagem.'));
+      }
+      if (atendimento.status_disponibilidade != 'DISPONIVEL') {
+        return concluir(util.erro(400, 'Mude a sua situação para "Disponível" para registrar a triagem.'));
       }
 
       // O trigger trg_triagens_bi_enfermeiro confere, no banco, se quem triou

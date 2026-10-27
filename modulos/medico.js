@@ -156,6 +156,42 @@ exports.consultaAberta = function (medicoId, callback) {
   });
 };
 
+// SITUAÇÃO DO MÉDICO: o próprio médico escolhe se está em plantão, em pausa,
+// de folga ou de licença. EM_CONSULTA não é escolhido: o sistema define ao
+// chamar o paciente e tira ao registrar o desfecho. Toda mudança é gravada
+// pelo banco em historico_status_medico (trigger trg_medicos_au_status).
+let situacoesMedico = ['EM_PLANTAO', 'PAUSA', 'FOLGA', 'LICENCA'];
+
+exports.alterarSituacao = function (dados, callback) {
+  let medicoId = parseInt(dados.medico_id, 10);
+  let situacao = util.texto(dados.status_operacional).toUpperCase();
+  if (isNaN(medicoId)) {
+    return callback(util.erro(400, 'Selecione o médico.'));
+  }
+  if (situacoesMedico.indexOf(situacao) == -1) {
+    return callback(util.erro(400, 'Escolha a situação: em plantão, em pausa, de folga ou de licença.'));
+  }
+
+  banco.transacao(function (conexao, concluir) {
+    // FOR UPDATE: a troca não se mistura com uma chamada de paciente ao mesmo tempo.
+    let sql = 'SELECT status_operacional FROM medicos WHERE id = ? AND ativo = 1 FOR UPDATE';
+    conexao.query(sql, [medicoId], function (err, medicos) {
+      if (err) {
+        return concluir(err);
+      }
+      if (medicos.length == 0) {
+        return concluir(util.erro(404, 'Médico não encontrado.'));
+      }
+      if (medicos[0].status_operacional == 'EM_CONSULTA') {
+        return concluir(util.erro(400, 'Registre o desfecho da consulta em andamento antes de mudar a sua situação.'));
+      }
+      conexao.query('UPDATE medicos SET status_operacional = ? WHERE id = ?', [situacao, medicoId], function (err) {
+        concluir(err, { status_operacional: situacao });
+      });
+    });
+  }, callback);
+};
+
 // MEDICAÇÕES (RF12): só o médico da consulta aberta pode prescrever.
 // O banco também confere (trigger trg_prescricoes_bi_medico).
 exports.registrarPrescricao = function (dados, callback) {

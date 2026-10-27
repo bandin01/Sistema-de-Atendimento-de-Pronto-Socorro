@@ -20,6 +20,7 @@ profissionais['medicos'] = [{ id: 3, nome: 'Helena Martins', especialidade: 'Cl�
                              crm_numero: '112233', crm_uf: 'SP', status_operacional: 'EM_PLANTAO' }];
 
 let anotados = [];   // cada consulta recebida: { sql, valores }
+let situacaoEnfermeiro = 'DISPONIVEL';   // situação devolvida para a enfermeira Marina
 
 function responderSql(sql, valores) {
   anotados.push({ sql: sql, valores: valores });
@@ -55,8 +56,11 @@ function responderSql(sql, valores) {
   if (sql.indexOf('FROM atendimentos a, recepcionistas r') != -1) {
     return [{ numero_atendimento: 'AT0010', recepcionista: 'Ana Paula Souza' }];
   }
-  if (sql.indexOf('FROM atendimentos a WHERE a.numero_atendimento = ? FOR UPDATE') != -1) {
-    return [{ id: 10, status: 'AGUARDANDO_TRIAGEM', enfermeiro: 'Marina Lopes' }];
+  if (sql.indexOf('FROM atendimentos a LEFT JOIN enfermeiros e') != -1) {
+    return [{ id: 10, status: 'AGUARDANDO_TRIAGEM', enfermeiro: 'Marina Lopes', status_disponibilidade: situacaoEnfermeiro }];
+  }
+  if (sql.indexOf('SELECT status_disponibilidade FROM enfermeiros WHERE id = ?') == 0) {
+    return [{ status_disponibilidade: situacaoEnfermeiro }];
   }
   if (sql.indexOf('INSERT') == 0 || sql.indexOf('UPDATE') == 0) {
     return { insertId: 1, affectedRows: 1 };
@@ -163,8 +167,11 @@ let rotasProtegidas = [
   { metodo: 'POST', endereco: '/api/atendimentos/cancelar', perfis: ['RECEPCAO'] },
   { metodo: 'GET', endereco: '/api/triagem/fila', perfis: ['ENFERMAGEM'] },
   { metodo: 'POST', endereco: '/api/triagem', perfis: ['ENFERMAGEM'] },
+  { metodo: 'GET', endereco: '/api/triagem/situacao', perfis: ['ENFERMAGEM'] },
+  { metodo: 'POST', endereco: '/api/triagem/situacao', perfis: ['ENFERMAGEM'] },
   { metodo: 'GET', endereco: '/api/painel', perfis: ['MEDICO'] },
   { metodo: 'POST', endereco: '/api/painel/chamar', perfis: ['MEDICO'] },
+  { metodo: 'POST', endereco: '/api/painel/situacao', perfis: ['MEDICO'] },
   { metodo: 'GET', endereco: '/api/consulta', perfis: ['MEDICO'] },
   { metodo: 'POST', endereco: '/api/consulta/prescricao', perfis: ['MEDICO'] },
   { metodo: 'POST', endereco: '/api/consulta/finalizar', perfis: ['MEDICO'] }
@@ -292,6 +299,35 @@ test('consulta de atendimento: CPF/RG completos só para a recepção', async fu
     assert.strictEqual(r.corpo.rg, '*****1905', perfil);
     assert.strictEqual(r.corpo.pode_alterar, false, perfil);
   }
+});
+
+test('médico: muda a própria situação, mas não escolhe EM_CONSULTA', async function () {
+  let r = await api('POST', '/api/painel/situacao', { status_operacional: 'PAUSA', medico_id: 999 }, tokens['MEDICO']);
+  assert.strictEqual(r.status, 200, JSON.stringify(r.corpo));
+  assert.deepStrictEqual(ultimaConsulta('UPDATE medicos SET status_operacional = ?').valores, ['PAUSA', 3]);
+
+  r = await api('POST', '/api/painel/situacao', { status_operacional: 'EM_CONSULTA' }, tokens['MEDICO']);
+  assert.strictEqual(r.status, 400);
+});
+
+test('enfermagem: muda a própria situação e só tria quando disponível', async function () {
+  let r = await api('POST', '/api/triagem/situacao', { status_disponibilidade: 'PAUSA', enfermeiro_id: 999 },
+                    tokens['ENFERMAGEM']);
+  assert.strictEqual(r.status, 200, JSON.stringify(r.corpo));
+  assert.deepStrictEqual(ultimaConsulta('UPDATE enfermeiros SET status_disponibilidade = ?').valores, ['PAUSA', 2]);
+
+  r = await api('POST', '/api/triagem/situacao', { status_disponibilidade: 'FOLGA' }, tokens['ENFERMAGEM']);
+  assert.strictEqual(r.status, 400);
+
+  situacaoEnfermeiro = 'PAUSA';
+  r = await api('GET', '/api/triagem/situacao', undefined, tokens['ENFERMAGEM']);
+  assert.deepStrictEqual(r.corpo, { status_disponibilidade: 'PAUSA' });
+  let dados = { numero_atendimento: 'AT0010', pressao_sistolica: 120, pressao_diastolica: 80, temperatura: '36,5',
+                frequencia_cardiaca: 80, queixa_principal: 'Dor de cabeça', classificacao_manchester: 'VERDE' };
+  r = await api('POST', '/api/triagem', dados, tokens['ENFERMAGEM']);
+  assert.strictEqual(r.status, 400);
+  assert.match(r.corpo.erro, /Disponível/);
+  situacaoEnfermeiro = 'DISPONIVEL';
 });
 
 test('corpo JSON que não é objeto é recusado', async function () {

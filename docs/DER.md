@@ -2,9 +2,11 @@
 
 Tabelas, colunas, chaves, nulidade e cardinalidades como estão no banco.
 Fonte: `banco/001_schema_base.sql` + scripts `010`, `011`, `012`, `013` e `014`.
-O modelo conceitual está em [MER.md](MER.md) e a descrição de cada coluna em [DICIONARIO_DADOS.md](DICIONARIO_DADOS.md). Imagem: [img/DER.svg](img/DER.svg) *(gerada antes da migration 013; a fonte atualizada é o diagrama Mermaid abaixo)*.
+O modelo conceitual está em [MER.md](MER.md) e a descrição de cada coluna em [DICIONARIO_DADOS.md](DICIONARIO_DADOS.md). Imagem: [img/DER.svg](img/DER.svg) *(atualizada com a migration 013; mostra o mesmo modelo do diagrama Mermaid abaixo)*.
 
 Recepcionistas, médicos e enfermeiros ficam em tabelas separadas, cada uma com o próprio `login` e `senha_hash`. Não existe tabela `usuarios`: o perfil de acesso é definido pela tabela onde o profissional está.
+
+> **Nesta versão do sistema** a entrada é feita escolhendo o perfil e o nome, sem senha: o servidor só confere `id` e `ativo = 1` na tabela do perfil (`modulos/sessoes.js`). As colunas `login`, `senha_hash` e `ultimo_login_em` continuam no banco, com as mesmas restrições, mas a aplicação não as lê nem grava. `login` e `senha_hash` recebem valores fixos em `dados_iniciais.sql`.
 
 O fluxo **Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho** é modelado com uma tabela por etapa: `atendimentos` → `triagens` → `consultas` → `desfechos`. A tabela `atendimentos` não guarda nada do médico: o vínculo fica em `consultas`, e o status operacional do médico fica em `medicos.status_operacional`.
 

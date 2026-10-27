@@ -174,9 +174,11 @@ A coluna *Perfis* mostra quem pode usar cada rota (*pública* = não precisa de 
 | POST | `/api/atendimentos/alterar` | Recepção | altera os dados do paciente |
 | POST | `/api/atendimentos/cancelar` | Recepção | cancela o atendimento |
 | GET | `/api/triagem/fila` | Enfermagem | pacientes aguardando triagem |
-| POST | `/api/triagem` | Enfermagem | registra a triagem |
+| POST | `/api/triagem` | Enfermagem | registra a triagem (só quem está disponível) |
+| GET / POST | `/api/triagem/situacao` | Enfermagem | consulta / altera a situação do(a) enfermeiro(a): disponível, pausa, indisponível |
 | GET | `/api/painel` | Médico | fila do médico, na ordem de Manchester |
 | POST | `/api/painel/chamar` | Médico | o médico chama o próximo paciente (confirmação médica) |
+| POST | `/api/painel/situacao` | Médico | altera a situação do médico: plantão, pausa, folga, licença |
 | GET | `/api/consulta` | Médico | consulta em andamento do médico logado |
 | POST | `/api/consulta/prescricao` | Médico | registra uma medicação |
 | POST | `/api/consulta/finalizar` | Médico | finaliza o atendimento com o desfecho |

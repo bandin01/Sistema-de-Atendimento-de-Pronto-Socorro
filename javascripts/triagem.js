@@ -6,9 +6,40 @@ let numeroEmTriagem = '';    // atendimento aberto no formulário
 
 // O(a) enfermeiro(a) responsável é quem entrou no sistema.
 if (exigirPerfil('ENFERMAGEM')) {
+  mostrarSituacao();
   carregarFila();
   setInterval(carregarFila, 15000);   // atualiza a fila a cada 15 segundos
 }
+
+// Mostra a situação do(a) enfermeiro(a): só quem está disponível registra triagem.
+function mostrarSituacao() {
+  chamarApi('GET', '/api/triagem/situacao', null, function (erro, resposta) {
+    if (erro) {
+      mostrarMensagem('msgSituacao', erro, 'erro');
+      return;
+    }
+    let situacao = resposta.status_disponibilidade;
+    elemento('situacao').value = situacao;
+    let texto = 'Situação: <span class="status">' + nomesStatus[situacao] + '</span>';
+    if (situacao != 'DISPONIVEL') {
+      texto += ' &nbsp; Para registrar triagens, mude para "Disponível".';
+    }
+    elemento('situacaoEnfermeiro').innerHTML = texto;
+  });
+}
+
+// ALTERAR SITUAÇÃO: disponível, em pausa ou indisponível.
+elemento('botaoSituacao').onclick = function () {
+  let dados = { status_disponibilidade: elemento('situacao').value };
+  chamarApi('POST', '/api/triagem/situacao', dados, function (erro) {
+    if (erro) {
+      mostrarMensagem('msgSituacao', erro, 'erro');
+      return;
+    }
+    mostrarSituacao();
+    mostrarMensagem('msgSituacao', 'Situação alterada.', 'sucesso');
+  });
+};
 
 function carregarFila() {
   chamarApi('GET', '/api/triagem/fila', null, function (erro, fila) {

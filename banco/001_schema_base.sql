@@ -2,10 +2,11 @@
 -- 001_schema_base.sql
 -- -----------------------------------------------------------------------------
 -- Schema base do fluxo de atendimento: pacientes, atendimentos (com o número
--- AT000), triagens e prescrições. As migrations 010, 011 e 012 completam o
--- modelo (profissionais, vínculos e histórico). Ordem: 001 → 010 → 011 → 012.
+-- AT0001), triagens e prescrições. As migrations 010 a 014 completam o
+-- modelo (profissionais, vínculos, histórico, consultas e desfechos).
+-- Ordem: 000 → 001 → 010 → 011 → 012 → 013 → 014 → dados_iniciais.
 --
--- Para recriar o banco inteiro de uma vez: src/db/recriar_banco.sh
+-- Para recriar o banco inteiro de uma vez: banco/script_completo.sql
 -- Requer MySQL 8.0.16+ (CHECK constraints são aplicadas a partir dessa versão).
 -- =============================================================================
 
@@ -18,8 +19,8 @@ CREATE TABLE IF NOT EXISTS pacientes (
   endereco         VARCHAR(255) NOT NULL,
   cpf              CHAR(11)     NULL,
   rg               VARCHAR(9)  NULL,
-  nome_pai         VARCHAR(50) NULL,
-  nome_mae         VARCHAR(50) NULL,
+  nome_pai         VARCHAR(150) NULL,
+  nome_mae         VARCHAR(150) NULL,
   data_nascimento  DATE         NOT NULL,
   criado_em        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -27,7 +28,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- -----------------------------------------------------------------------------
--- Número de atendimento AT000 (RNF03)
+-- Número de atendimento AT0001 (RNF03; 4 dígitos a partir da migration 014)
 -- -----------------------------------------------------------------------------
 -- Por que uma tabela de sequência?
 --   * Em um BEFORE INSERT o valor de AUTO_INCREMENT da própria linha ainda não

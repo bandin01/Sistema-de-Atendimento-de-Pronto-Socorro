@@ -88,7 +88,7 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | crm_numero | VARCHAR(10) | NÃO | UK (com crm_uf) | | Só dígitos. |
 | crm_uf | CHAR(2) | NÃO | UK (com crm_numero) | | UF válida. |
 | especialidade | VARCHAR(100) | NÃO | | | |
-| status_operacional | ENUM status operacional | NÃO | | `FOLGA` | Situação do médico no plantão. `EM_CONSULTA` só é definido pelo sistema. Inativo só em `FOLGA`/`LICENCA` (`chk_medicos_inativo_fora_do_plantao`). Toda mudança vai para `historico_status_medico`. Na API: campo `statusDisponibilidade`. |
+| status_operacional | ENUM status operacional | NÃO | | `FOLGA` | Situação do médico no plantão. `EM_CONSULTA` só é definido pelo sistema. Inativo só em `FOLGA`/`LICENCA` (`chk_medicos_inativo_fora_do_plantao`). Toda mudança vai para `historico_status_medico`. O médico altera no Painel (`POST /api/painel/situacao`), exceto `EM_CONSULTA`. Na API: campo `status_operacional` (`GET /api/medicos`, `GET /api/painel`). |
 | login | VARCHAR(60) | NÃO | UK | | Único entre as três tabelas. |
 | senha_hash | VARCHAR(255) | NÃO | | | |
 | ativo | TINYINT(1) | NÃO | | 1 | |
@@ -113,7 +113,7 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | coren_uf | CHAR(2) | NÃO | UK (com coren_numero) | | |
 | categoria | ENUM categoria | NÃO | | `ENFERMEIRO` | Só `ENFERMEIRO` registra triagem (RF18). |
 | especialidade | VARCHAR(100) | SIM | | | |
-| status_disponibilidade | ENUM disponibilidade | NÃO | | `INDISPONIVEL` | Inativo só `INDISPONIVEL`. |
+| status_disponibilidade | ENUM disponibilidade | NÃO | | `INDISPONIVEL` | Inativo só `INDISPONIVEL`. O próprio enfermeiro altera na tela de Triagem; só registra triagem quando `DISPONIVEL` (regra da aplicação). |
 | login | VARCHAR(60) | NÃO | UK | | Único entre as três tabelas. |
 | senha_hash | VARCHAR(255) | NÃO | | | |
 | ativo | TINYINT(1) | NÃO | | 1 | |
@@ -164,7 +164,7 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | id | INT UNSIGNED | NÃO | PK | AUTO_INCREMENT | |
 | atendimento_id | INT UNSIGNED | NÃO | FK → atendimentos.id, UK | | Uma consulta por atendimento. Exige atendimento `EM_CONSULTA`. |
 | medico_id | INT UNSIGNED | NÃO | FK → medicos.id | | Médico responsável, ativo, imutável (RF19). |
-| iniciada_em | DATETIME | NÃO | | CURRENT_TIMESTAMP | **Confirmação médica**: a partir daqui o atendimento não é alterado nem cancelado (RF04, RF05). Na API: `confirmadoMedicoEm`. |
+| iniciada_em | DATETIME | NÃO | | CURRENT_TIMESTAMP | **Confirmação médica**: a partir daqui o atendimento não é alterado nem cancelado (RF04, RF05). Na API: `confirmado_em` (lista de atendimentos) e `iniciada_em` (consulta do médico). |
 | finalizada_em | DATETIME | SIM | | | Preenchida no desfecho; exige desfecho registrado. ≥ `iniciada_em`. |
 | medico_em_consulta_id | INT UNSIGNED (gerada, STORED) | SIM | UK | | `medico_id` enquanto a consulta está aberta. O índice único garante uma consulta aberta por médico (RF20). |
 

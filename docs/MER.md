@@ -11,13 +11,13 @@ Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho/Finalizaç
 ```
 
 Fonte: `banco/001_schema_base.sql` + scripts `010`, `011`, `012`, `013` e `014`.
-O modelo lógico (tabelas, colunas, chaves, `NOT NULL`) está em [DER.md](DER.md) e o detalhamento de cada coluna em [DICIONARIO_DADOS.md](DICIONARIO_DADOS.md). Imagens: [img/MER.svg](img/MER.svg), [img/ciclo_atendimento.svg](img/ciclo_atendimento.svg) *(geradas antes da migration 013; a fonte atualizada são os diagramas Mermaid deste arquivo)*.
+O modelo lógico (tabelas, colunas, chaves, `NOT NULL`) está em [DER.md](DER.md) e o detalhamento de cada coluna em [DICIONARIO_DADOS.md](DICIONARIO_DADOS.md). Imagens: [img/MER.svg](img/MER.svg), [img/ciclo_atendimento.svg](img/ciclo_atendimento.svg) *(atualizadas com a migration 013; mostram o mesmo modelo dos diagramas Mermaid deste arquivo)*.
 
 ## Classificação das entidades
 
 | Categoria | Entidades | Papel no modelo |
 |---|---|---|
-| **Atores** | Paciente, Recepcionista, Enfermeiro, Médico | Pessoas que participam do processo. Os três profissionais têm login próprio; o perfil de acesso vem da entidade em que estão (não há entidade "usuário"). |
+| **Atores** | Paciente, Recepcionista, Enfermeiro, Médico | Pessoas que participam do processo. O perfil de acesso vem da entidade em que o profissional está (não há entidade "usuário"): ao entrar, ele escolhe o perfil e o próprio nome, e o sistema confere se está ativo naquela entidade. |
 | **Etapas do processo** | Atendimento *(Atendimento Inicial)*, Triagem, Consulta, Desfecho | Passos do fluxo do paciente. Cada etapa clínica aponta para o ator responsável por ela. |
 | **Itens de etapa** | Prescrição | Detalhe do desfecho/consulta: um registro por medicamento. |
 | **Rastreabilidade** | Histórico de Status, Histórico de Etapas, Histórico de Status do Médico | Trilhas de auditoria. Nunca são alteradas pela aplicação. |
@@ -121,7 +121,11 @@ Legenda: **sublinhado** = identificador · *(s)* = dado sensível (RNF09) · *(o
 
 O `login` é único dentro de cada entidade e também entre as três (não existem dois profissionais com o mesmo login).
 
-O **status operacional do médico** pertence ao Médico, não ao Atendimento. `EM_PLANTAO` permite chamar pacientes, `EM_CONSULTA` só o sistema define (ao chamar o paciente), e `PAUSA`, `FOLGA` e `LICENCA` são escolhidos pelo próprio médico. Médico desativado fica em `FOLGA` ou `LICENCA`.
+> **Nesta versão do sistema** a entrada é feita escolhendo o perfil e o nome, sem senha (veja o `README.md`). Os atributos `login`, `senha_hash` e `ultimo_login_em` continuam no modelo e no banco (`login` e `senha_hash` são obrigatórios e preenchidos com valores fixos em `dados_iniciais.sql`), mas a aplicação não os usa.
+
+O **status operacional do médico** pertence ao Médico, não ao Atendimento. `EM_PLANTAO` permite chamar pacientes, `EM_CONSULTA` só o sistema define (ao chamar o paciente), e `PAUSA`, `FOLGA` e `LICENCA` são situações de escala (plantão, pausa, folga, licença). Médico desativado fica em `FOLGA` ou `LICENCA`.
+
+> **Na aplicação**, o médico escolhe `EM_PLANTAO`, `PAUSA`, `FOLGA` ou `LICENCA` no Painel do Médico (`POST /api/painel/situacao`), exceto durante uma consulta. As trocas para `EM_CONSULTA` (ao chamar o paciente) e de volta para `EM_PLANTAO` (ao registrar o desfecho) são automáticas. Só o médico `EM_PLANTAO` chama pacientes. O enfermeiro escolhe `DISPONIVEL`, `PAUSA` ou `INDISPONIVEL` na tela de Triagem (`POST /api/triagem/situacao`) e só registra triagem quando está `DISPONIVEL`. Toda troca do médico vai para `historico_status_medico`.
 
 ### Etapas do processo
 
@@ -191,4 +195,4 @@ stateDiagram-v2
   EM_CONSULTA --> EM_PLANTAO: registra desfecho (sistema)
 ```
 
-Fora de `EM_CONSULTA`, o médico escolhe livremente entre `EM_PLANTAO`, `PAUSA`, `FOLGA` e `LICENCA`. O diagrama mostra as transições usuais. Enquanto estiver `EM_CONSULTA`, o médico não muda de status nem pode ser desativado.
+O banco não restringe as transições entre os cinco valores (o diagrama mostra as transições usuais). Na aplicação, as marcadas como "sistema" são automáticas e as demais são escolhidas pelo médico no painel. Enquanto o médico estiver `EM_CONSULTA`, a aplicação não muda o status dele até o desfecho, e o banco impede a desativação (`chk_medicos_inativo_fora_do_plantao` só aceita médico inativo em `FOLGA` ou `LICENCA`).

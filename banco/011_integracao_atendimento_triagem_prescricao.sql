@@ -13,7 +13,7 @@
 --    abaixo falha com "Invalid use of NULL value". Nesse caso, faça o backfill
 --    (UPDATE triagens SET enfermeiro_id = <id> WHERE enfermeiro_id IS NULL) antes.
 --
--- A regra do número AT000 (RNF03) NÃO é alterada por esta migration.
+-- A regra do número AT0001 (RNF03) NÃO é alterada por esta migration.
 -- Execute pelo MySQL CLI ou Workbench (usa DELIMITER). Requer MySQL 8.0.16+.
 -- =============================================================================
 

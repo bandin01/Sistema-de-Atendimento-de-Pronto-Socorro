@@ -9,6 +9,8 @@ nomesStatus['FINALIZADO'] = 'Finalizado';
 nomesStatus['CANCELADO'] = 'Cancelado';
 
 nomesStatus['EM_PLANTAO'] = 'Em plantão';
+nomesStatus['DISPONIVEL'] = 'Disponível';
+nomesStatus['INDISPONIVEL'] = 'Indisponível';
 nomesStatus['PAUSA'] = 'Em pausa';
 nomesStatus['FOLGA'] = 'De folga';
 nomesStatus['LICENCA'] = 'De licença';

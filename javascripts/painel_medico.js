@@ -17,7 +17,17 @@ function mostrarSituacao() {
       mostrarMensagem('msgPainel', erro, 'erro');
       return;
     }
-    let texto = 'Situação: <span class="status">' + nomesStatus[resposta.medico.status_operacional] + '</span>';
+    let situacao = resposta.medico.status_operacional;
+    let texto = 'Situação: <span class="status">' + nomesStatus[situacao] + '</span>';
+    // Em consulta, a situação só muda com o desfecho; fora do plantão, não chama paciente.
+    elemento('botaoSituacao').disabled = (situacao == 'EM_CONSULTA');
+    elemento('situacao').disabled = (situacao == 'EM_CONSULTA');
+    if (situacao != 'EM_CONSULTA') {
+      elemento('situacao').value = situacao;
+    }
+    if (situacao != 'EM_PLANTAO') {
+      elemento('botaoChamar').disabled = true;
+    }
     if (resposta.consulta) {
       texto += ' &nbsp; Consulta em andamento: <a href="consulta_medica.html">' +
                protegerTexto(resposta.consulta.numero_atendimento) + ' – ' + protegerTexto(resposta.consulta.nome) +
@@ -27,6 +37,19 @@ function mostrarSituacao() {
     elemento('situacaoMedico').innerHTML = texto;
   });
 }
+
+// ALTERAR SITUAÇÃO: em plantão, em pausa, de folga ou de licença.
+elemento('botaoSituacao').onclick = function () {
+  let dados = { status_operacional: elemento('situacao').value };
+  chamarApi('POST', '/api/painel/situacao', dados, function (erro) {
+    if (erro) {
+      mostrarMensagem('msgPainel', erro, 'erro');
+      return;
+    }
+    mostrarSituacao();
+    mostrarMensagem('msgPainel', 'Situação alterada.', 'sucesso');
+  });
+};
 
 // CHAMAR PRÓXIMO: o sistema entrega ao médico o paciente de maior prioridade.
 elemento('botaoChamar').onclick = function () {

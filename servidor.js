@@ -100,6 +100,15 @@ rotas['POST /api/triagem'] = function (consulta, dados, sessao, callback) {
   triagem.registrar(dados, callback);
 };
 permissoes['POST /api/triagem'] = [ENFERMAGEM];
+rotas['GET /api/triagem/situacao'] = function (consulta, dados, sessao, callback) {
+  triagem.situacao(sessao.id, callback);
+};
+permissoes['GET /api/triagem/situacao'] = [ENFERMAGEM];
+rotas['POST /api/triagem/situacao'] = function (consulta, dados, sessao, callback) {
+  dados.enfermeiro_id = sessao.id;
+  triagem.alterarSituacao(dados, callback);
+};
+permissoes['POST /api/triagem/situacao'] = [ENFERMAGEM];
 
 // Médico: só o médico
 rotas['GET /api/painel'] = function (consulta, dados, sessao, callback) {
@@ -111,6 +120,11 @@ rotas['POST /api/painel/chamar'] = function (consulta, dados, sessao, callback) 
   medico.chamarProximo(dados, callback);
 };
 permissoes['POST /api/painel/chamar'] = [MEDICO];
+rotas['POST /api/painel/situacao'] = function (consulta, dados, sessao, callback) {
+  dados.medico_id = sessao.id;
+  medico.alterarSituacao(dados, callback);
+};
+permissoes['POST /api/painel/situacao'] = [MEDICO];
 rotas['GET /api/consulta'] = function (consulta, dados, sessao, callback) {
   medico.consultaAberta(sessao.id, callback);
 };

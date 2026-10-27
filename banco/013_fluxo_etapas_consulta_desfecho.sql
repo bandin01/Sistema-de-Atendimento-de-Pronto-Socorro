@@ -29,8 +29,8 @@
 --      ou ALTA, com descrição obrigatória. Sem desfecho não há finalização.
 --   5. Histórico de etapas do paciente (historico_etapas): uma linha por etapa,
 --      com a descrição textual (VARCHAR) do que aconteceu.
---   6. RG passa de VARCHAR(20) para VARCHAR(9) em todas as tabelas, com CHECK
---      de formato (mesma regra do validador da API: 5 a 9 dígitos ou X).
+--   6. RG fica VARCHAR(9) em todas as tabelas (profissionais saem de VARCHAR(20)),
+--      com CHECK de formato (mesma regra do validador da API: 5 a 9 dígitos ou X).
 --   7. NOT NULL / CHECK de coerência: atendimento FINALIZADO ⇔ finalizado_em.
 --
 -- ⚠️ BANCO COM DADOS:
@@ -44,7 +44,7 @@
 --
 -- Ordem das seções importa: os triggers novos são criados só no FINAL, depois
 -- da conversão dos dados (eles bloqueariam o backfill de registros finalizados).
--- Requer MySQL 8.0.16+. Execute pelo runner (npm run migrate) ou pelo MySQL CLI.
+-- Requer MySQL 8.0.16+. Execute pelo MySQL CLI ou Workbench (ou use script_completo.sql).
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------

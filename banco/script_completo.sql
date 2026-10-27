@@ -25,10 +25,11 @@ USE pronto_socorro;
 -- 001_schema_base.sql
 -- -----------------------------------------------------------------------------
 -- Schema base do fluxo de atendimento: pacientes, atendimentos (com o número
--- AT000), triagens e prescrições. As migrations 010, 011 e 012 completam o
--- modelo (profissionais, vínculos e histórico). Ordem: 001 → 010 → 011 → 012.
+-- AT0001), triagens e prescrições. As migrations 010 a 014 completam o
+-- modelo (profissionais, vínculos, histórico, consultas e desfechos).
+-- Ordem: 000 → 001 → 010 → 011 → 012 → 013 → 014 → dados_iniciais.
 --
--- Para recriar o banco inteiro de uma vez: src/db/recriar_banco.sh
+-- Para recriar o banco inteiro de uma vez: banco/script_completo.sql
 -- Requer MySQL 8.0.16+ (CHECK constraints são aplicadas a partir dessa versão).
 -- =============================================================================
 
@@ -50,7 +51,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- -----------------------------------------------------------------------------
--- Número de atendimento AT000 (RNF03)
+-- Número de atendimento AT0001 (RNF03; 4 dígitos a partir da migration 014)
 -- -----------------------------------------------------------------------------
 -- Por que uma tabela de sequência?
 --   * Em um BEFORE INSERT o valor de AUTO_INCREMENT da própria linha ainda não
@@ -368,7 +369,7 @@ DELIMITER ;
 --    abaixo falha com "Invalid use of NULL value". Nesse caso, faça o backfill
 --    (UPDATE triagens SET enfermeiro_id = <id> WHERE enfermeiro_id IS NULL) antes.
 --
--- A regra do número AT000 (RNF03) NÃO é alterada por esta migration.
+-- A regra do número AT0001 (RNF03) NÃO é alterada por esta migration.
 -- Execute pelo MySQL CLI ou Workbench (usa DELIMITER). Requer MySQL 8.0.16+.
 -- =============================================================================
 
@@ -620,8 +621,8 @@ CREATE TABLE IF NOT EXISTS historico_status (
 --      ou ALTA, com descrição obrigatória. Sem desfecho não há finalização.
 --   5. Histórico de etapas do paciente (historico_etapas): uma linha por etapa,
 --      com a descrição textual (VARCHAR) do que aconteceu.
---   6. RG passa de VARCHAR(20) para VARCHAR(9) em todas as tabelas, com CHECK
---      de formato (mesma regra do validador da API: 5 a 9 dígitos ou X).
+--   6. RG fica VARCHAR(9) em todas as tabelas (profissionais saem de VARCHAR(20)),
+--      com CHECK de formato (mesma regra do validador da API: 5 a 9 dígitos ou X).
 --   7. NOT NULL / CHECK de coerência: atendimento FINALIZADO ⇔ finalizado_em.
 --
 -- ⚠️ BANCO COM DADOS:
@@ -635,7 +636,7 @@ CREATE TABLE IF NOT EXISTS historico_status (
 --
 -- Ordem das seções importa: os triggers novos são criados só no FINAL, depois
 -- da conversão dos dados (eles bloqueariam o backfill de registros finalizados).
--- Requer MySQL 8.0.16+. Execute pelo runner (npm run migrate) ou pelo MySQL CLI.
+-- Requer MySQL 8.0.16+. Execute pelo MySQL CLI ou Workbench (ou use script_completo.sql).
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------

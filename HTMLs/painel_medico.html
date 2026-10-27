@@ -33,6 +33,15 @@
       <p id="usuarioLogado"></p>
       <form class="linha" onsubmit="return false">
         <button type="button" id="botaoChamar">Chamar próximo paciente</button>
+        <label>Minha situação
+          <select id="situacao">
+            <option value="EM_PLANTAO">Em plantão</option>
+            <option value="PAUSA">Em pausa</option>
+            <option value="FOLGA">De folga</option>
+            <option value="LICENCA">De licença</option>
+          </select>
+        </label>
+        <button type="button" id="botaoSituacao" class="secundario">Alterar situação</button>
       </form>
       <p id="situacaoMedico"></p>
       <p id="msgPainel" class="mensagem" hidden></p>

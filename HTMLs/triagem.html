@@ -31,6 +31,18 @@
     <section>
       <h2>Enfermeiro(a) responsável</h2>
       <p id="usuarioLogado"></p>
+      <form class="linha" onsubmit="return false">
+        <label>Minha situação
+          <select id="situacao">
+            <option value="DISPONIVEL">Disponível</option>
+            <option value="PAUSA">Em pausa</option>
+            <option value="INDISPONIVEL">Indisponível</option>
+          </select>
+        </label>
+        <button type="button" id="botaoSituacao" class="secundario">Alterar situação</button>
+      </form>
+      <p id="situacaoEnfermeiro"></p>
+      <p id="msgSituacao" class="mensagem" hidden></p>
     </section>
 
     <section class="rolagem">
