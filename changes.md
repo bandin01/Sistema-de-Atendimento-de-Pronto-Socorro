@@ -51,7 +51,13 @@
 - Teste de mutação: estraguei de propósito uma coisa de cada vez (não conferir a senha, aceitar inativo, não padronizar o login, não gravar `ultimo_login_em`, mensagem diferente para senha longa). Em todos os casos algum teste falhou.
 - Os 6 hashes gravados no SQL foram conferidos com `modulos/senhas.js`: aceitam `senha123` e recusam `senha124`.
 - O servidor real sobe, entrega a página e responde 400 quando falta a senha.
-- **Não validado contra um MySQL real**: a senha do MySQL desta máquina é diferente da que está em `modulos/banco.js`. Vale rodar o `script_completo.sql` (ou o `015` num banco que já existe) e entrar com `ana.souza` / `senha123`.
+- **Validado contra o MySQL 9.6 real**, num banco que já existia (6 atendimentos):
+  - o `015_senhas_profissionais.sql` gravou o hash nos 6 profissionais, sem apagar nenhum dado;
+  - com o servidor real, cada perfil entrou com `senha123` (`ana.souza`, `marina.lopes` e `helena.martins`) e conseguiu usar a sua tela (`/api/atendimentos`, `/api/triagem/fila` e `/api/painel`);
+  - senha errada, login de outro perfil e login inexistente deram 400 com *Login ou senha incorretos.*;
+  - login em maiúsculas também entrou;
+  - `ultimo_login_em` foi gravado no banco.
+- O `script_completo.sql` (banco criado do zero) não foi executado nesta validação. Ele usa os mesmos hashes já conferidos.
 
 ## Pendências / próximos passos possíveis
 
