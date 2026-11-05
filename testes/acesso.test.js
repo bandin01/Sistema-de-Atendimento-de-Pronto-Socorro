@@ -1,4 +1,5 @@
-// Testes do controle de acesso por perfil (RNF08) e do mascaramento de CPF/RG (RNF09).
+// Testes do controle de acesso por perfil (RNF08), da entrada com login e senha
+// e do mascaramento de CPF/RG (RNF09).
 // Para rodar:  npm test   (ou  node --test testes/)
 //
 // Não precisam do MySQL: antes de carregar o servidor, o módulo modulos/banco.js
@@ -9,25 +10,42 @@ let test = require('node:test');
 let assert = require('node:assert');
 let http = require('http');
 let path = require('path');
+let crypto = require('crypto');
 
 // ---------------------------------------------------------------------------
 // Banco falso
 // ---------------------------------------------------------------------------
+// Hash no mesmo formato de modulos/senhas.js (scrypt$sal$hash), feito aqui de
+// forma independente para o teste não depender do próprio módulo que testa.
+function hashDe(senha) {
+  let sal = crypto.randomBytes(16).toString('hex');
+  return 'scrypt$' + sal + '$' + crypto.scryptSync(senha, sal, 64).toString('hex');
+}
+let SENHA = 'senha123';
+
 let profissionais = [];
-profissionais['recepcionistas'] = [{ id: 1, nome: 'Ana Paula Souza' }];
-profissionais['enfermeiros'] = [{ id: 2, nome: 'Marina Lopes', coren_numero: '123456', coren_uf: 'SP' }];
+profissionais['recepcionistas'] = [
+  { id: 1, nome: 'Ana Paula Souza', login: 'ana.souza', senha_hash: hashDe(SENHA), ativo: 1 },
+  // Profissional desativado: mesmo com a senha certa não entra.
+  { id: 4, nome: 'Bruno Henrique Dias', login: 'bruno.dias', senha_hash: hashDe(SENHA), ativo: 0 },
+  // Cadastro antigo, ainda sem senha (valor de antes do script 015).
+  { id: 5, nome: 'Sem Senha', login: 'sem.senha', senha_hash: 'login-nao-utilizado', ativo: 1 }
+];
+profissionais['enfermeiros'] = [{ id: 2, nome: 'Marina Lopes', coren_numero: '123456', coren_uf: 'SP',
+                                  login: 'marina.lopes', senha_hash: hashDe(SENHA), ativo: 1 }];
 profissionais['medicos'] = [{ id: 3, nome: 'Helena Martins', especialidade: 'Clínica Médica',
-                             crm_numero: '112233', crm_uf: 'SP', status_operacional: 'EM_PLANTAO' }];
+                             crm_numero: '112233', crm_uf: 'SP', status_operacional: 'EM_PLANTAO',
+                             login: 'helena.martins', senha_hash: hashDe(SENHA), ativo: 1 }];
 
 let anotados = [];   // cada consulta recebida: { sql, valores }
 let situacaoEnfermeiro = 'DISPONIVEL';   // situação devolvida para a enfermeira Marina
 
 function responderSql(sql, valores) {
   anotados.push({ sql: sql, valores: valores });
-  let login = sql.match(/^SELECT id, nome FROM (\w+) WHERE id = \? AND ativo = 1$/);
+  let login = sql.match(/^SELECT id, nome, senha_hash FROM (\w+) WHERE login = \? AND ativo = 1$/);
   if (login) {
     return profissionais[login[1]].filter(function (p) {
-      return p.id == valores[0];
+      return p.login === valores[0] && p.ativo == 1;
     });
   }
   if (sql.indexOf('FROM recepcionistas WHERE ativo = 1') != -1) {
@@ -144,8 +162,8 @@ function api(metodo, endereco, dados, token) {
   });
 }
 
-async function entrar(perfil, id) {
-  let resposta = await api('POST', '/api/entrar', { perfil: perfil, profissional_id: id });
+async function entrar(perfil, login) {
+  let resposta = await api('POST', '/api/entrar', { perfil: perfil, login: login, senha: SENHA });
   assert.strictEqual(resposta.status, 200, JSON.stringify(resposta.corpo));
   return resposta.corpo.token;
 }
@@ -180,9 +198,9 @@ let rotasProtegidas = [
 let tokens = [];
 
 test.before(async function () {
-  tokens['RECEPCAO'] = await entrar('RECEPCAO', 1);
-  tokens['ENFERMAGEM'] = await entrar('ENFERMAGEM', 2);
-  tokens['MEDICO'] = await entrar('MEDICO', 3);
+  tokens['RECEPCAO'] = await entrar('RECEPCAO', 'ana.souza');
+  tokens['ENFERMAGEM'] = await entrar('ENFERMAGEM', 'marina.lopes');
+  tokens['MEDICO'] = await entrar('MEDICO', 'helena.martins');
 });
 
 test.after(function () {
@@ -202,19 +220,94 @@ test('mascaramento de CPF e RG', function () {
   assert.strictEqual(util.mascararRg(null), null);
 });
 
-test('entrar: perfil inválido, profissional inexistente e sucesso', async function () {
-  let r = await api('POST', '/api/entrar', { perfil: 'ADMIN', profissional_id: 1 });
-  assert.strictEqual(r.status, 400);
-  r = await api('POST', '/api/entrar', { perfil: 'MEDICO', profissional_id: 999 });
-  assert.strictEqual(r.status, 400);
-  // id de uma recepcionista não serve para entrar como médico
-  r = await api('POST', '/api/entrar', { perfil: 'MEDICO', profissional_id: 1 });
-  assert.strictEqual(r.status, 400);
-  r = await api('POST', '/api/entrar', { perfil: 'medico', profissional_id: '3' });
-  assert.strictEqual(r.status, 200);
+test('senhas: hash com sal, confere a certa e recusa a errada', async function () {
+  let senhas = require(path.join(raiz, 'modulos', 'senhas.js'));
+  let gerar = function (senha) {
+    return new Promise(function (resolve, reject) {
+      senhas.gerarHash(senha, function (err, texto) {
+        return err ? reject(err) : resolve(texto);
+      });
+    });
+  };
+  let conferir = function (senha, gravado) {
+    return new Promise(function (resolve, reject) {
+      senhas.conferir(senha, gravado, function (err, confere) {
+        return err ? reject(err) : resolve(confere);
+      });
+    });
+  };
+  let h1 = await gerar('senha123');
+  let h2 = await gerar('senha123');
+  assert.match(h1, /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$/);
+  assert.ok(h1.length <= 255, 'cabe na coluna senha_hash VARCHAR(255)');
+  assert.notStrictEqual(h1, h2, 'mesma senha, sal diferente, hash diferente');
+  assert.strictEqual(h1.indexOf('senha123'), -1, 'a senha não aparece no hash');
+  assert.strictEqual(await conferir('senha123', h1), true);
+  assert.strictEqual(await conferir('senha124', h1), false);
+  assert.strictEqual(await conferir('Senha123', h1), false);
+  assert.strictEqual(await conferir('', h1), false);
+  // Hash feito por outro código (o do banco falso) também confere: o formato é o mesmo.
+  assert.strictEqual(await conferir(SENHA, profissionais['medicos'][0].senha_hash), true);
+  // Valores fora do formato nunca conferem.
+  for (let gravado of ['login-nao-utilizado', '', 'scrypt$abc$def', null, undefined]) {
+    assert.strictEqual(await conferir('senha123', gravado), false, String(gravado));
+  }
+});
+
+test('entrar: campos obrigatórios', async function () {
+  let casos = [
+    [{ perfil: 'ADMIN', login: 'ana.souza', senha: SENHA }, /perfil/],
+    [{ login: 'ana.souza', senha: SENHA }, /perfil/],
+    [{ perfil: 'RECEPCAO', login: '  ', senha: SENHA }, /login/],
+    [{ perfil: 'RECEPCAO', login: 'ana.souza', senha: '' }, /senha/],
+    [{ perfil: 'RECEPCAO', login: 'ana.souza' }, /senha/],
+    [{ perfil: 'RECEPCAO', login: 'ana.souza', senha: 12345678 }, /senha/]
+  ];
+  for (let caso of casos) {
+    let r = await api('POST', '/api/entrar', caso[0]);
+    assert.strictEqual(r.status, 400, JSON.stringify(caso[0]));
+    assert.match(r.corpo.erro, caso[1], JSON.stringify(caso[0]));
+    assert.strictEqual(r.corpo.token, undefined);
+  }
+});
+
+test('entrar: falhas dão sempre a mesma resposta, sem dizer o que estava errado', async function () {
+  let falhas = [
+    { perfil: 'RECEPCAO', login: 'ana.souza', senha: 'senhaErrada1' },       // senha errada
+    { perfil: 'RECEPCAO', login: 'ana.souza', senha: 'SENHA123' },           // maiúsculas importam na senha
+    { perfil: 'RECEPCAO', login: 'nao.existe', senha: SENHA },               // login inexistente
+    { perfil: 'MEDICO', login: 'ana.souza', senha: SENHA },                  // login de outro perfil
+    { perfil: 'RECEPCAO', login: 'bruno.dias', senha: SENHA },               // profissional inativo
+    { perfil: 'RECEPCAO', login: 'sem.senha', senha: 'login-nao-utilizado' }, // cadastro sem hash
+    { perfil: 'RECEPCAO', login: 'ana.souza', senha: 'a'.repeat(73) }        // senha longa demais
+  ];
+  for (let dados of falhas) {
+    let r = await api('POST', '/api/entrar', dados);
+    assert.strictEqual(r.status, 400, JSON.stringify(dados));
+    assert.strictEqual(r.corpo.erro, 'Login ou senha incorretos.', JSON.stringify(dados));
+  }
+});
+
+test('entrar: sucesso, login sem diferenciar maiúsculas e registro do último acesso', async function () {
+  let r = await api('POST', '/api/entrar', { perfil: 'medico', login: '  Helena.Martins ', senha: SENHA });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.corpo));
   assert.match(r.corpo.token, /^[0-9a-f]{48}$/);
+  assert.deepStrictEqual(Object.keys(r.corpo).sort(), ['id', 'nome', 'perfil', 'token']);  // nada de senha_hash
   assert.strictEqual(r.corpo.perfil, 'MEDICO');
+  assert.strictEqual(r.corpo.id, 3);
   assert.strictEqual(r.corpo.nome, 'Helena Martins');
+  // O banco recebe só o login (já padronizado), nunca a senha.
+  assert.deepStrictEqual(ultimaConsulta('SELECT id, nome, senha_hash FROM medicos').valores, ['helena.martins']);
+  assert.deepStrictEqual(ultimaConsulta('UPDATE medicos SET ultimo_login_em = NOW()').valores, [3]);
+  // A sessão aberta funciona.
+  let s = await api('GET', '/api/sessao', undefined, r.corpo.token);
+  assert.deepStrictEqual(s.corpo, { perfil: 'MEDICO', id: 3, nome: 'Helena Martins' });
+});
+
+test('entrar: o antigo jeito (só perfil + id do profissional) não funciona mais', async function () {
+  let r = await api('POST', '/api/entrar', { perfil: 'MEDICO', profissional_id: 3 });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(r.corpo.token, undefined);
 });
 
 test('rotas públicas funcionam sem sessão', async function () {
@@ -338,7 +431,7 @@ test('corpo JSON que não é objeto é recusado', async function () {
 });
 
 test('sair encerra a sessão', async function () {
-  let token = await entrar('RECEPCAO', 1);
+  let token = await entrar('RECEPCAO', 'ana.souza');
   let r = await api('POST', '/api/sair', undefined, token);
   assert.strictEqual(r.status, 200);
   r = await api('GET', '/api/sessao', undefined, token);

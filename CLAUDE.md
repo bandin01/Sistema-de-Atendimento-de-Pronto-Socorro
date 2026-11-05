@@ -29,7 +29,8 @@ modulos/           back-end — regras de negócio e acesso ao MySQL
   medico.js        painel, chamar próximo, prescrições, finalizar com desfecho
   profissionais.js listas de recepcionistas, enfermeiros e médicos
   historico.js     histórico de status e de etapas
-  sessoes.js       entrada no sistema (perfil + profissional, sem senha) e sessões em memória
+  sessoes.js       entrada no sistema (perfil + login + senha) e sessões em memória
+  senhas.js        hash e conferência de senha com scrypt (crypto nativo); `node modulos/senhas.js "senha"` gera um hash
   utilitarios.js   funções pequenas reaproveitadas (erro, texto, numeroAtendimento…)
 index.html         página inicial (entrada no sistema)
 HTMLs/             telas: recepcao, triagem, painel_medico, consulta_medica
@@ -65,7 +66,7 @@ npm test                                        # testes de controle de acesso
 - Número de atendimento (`AT0001`) único e sequencial, seguro sob concorrência (RNF03) — via `AUTO_INCREMENT` + trigger no MySQL.
 - Painel médico ordenado por classificação de Manchester na query SQL (`ORDER BY FIELD(...)`), nunca só no front-end (RF09).
 - Operações concorrentes (alterar, cancelar, chamar próximo, finalizar) dentro de transação com `SELECT ... FOR UPDATE`.
-- Acesso por perfil (recepção, enfermagem, médico) validado em toda rota da API, não só na UI (RNF08). A entrada é por escolha de perfil + profissional, sem senha (decisão do grupo).
+- Acesso por perfil (recepção, enfermagem, médico) validado em toda rota da API, não só na UI (RNF08). A entrada é por perfil + login + senha (exigência do professor); a senha é guardada só como hash scrypt em `senha_hash`, e qualquer falha de entrada devolve a mesma mensagem genérica.
 - CPF/RG completos só para a recepção; mascarados para os outros perfis (RNF09).
 
 ## Fluxo de trabalho

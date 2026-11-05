@@ -32,7 +32,8 @@ teste trabalho/
 │   ├── medico.js          painel, chamar próximo, medicações, finalizar
 │   ├── profissionais.js   listas de recepcionistas, enfermeiros e médicos
 │   ├── historico.js       histórico de status e de etapas do atendimento
-│   ├── sessoes.js         entrada no sistema e sessões por perfil (controle de acesso)
+│   ├── sessoes.js         entrada no sistema (login + senha) e sessões por perfil
+│   ├── senhas.js          hash e conferência das senhas (scrypt)
 │   └── utilitarios.js     funções pequenas reaproveitadas
 ├── index.html             página inicial
 ├── HTMLs/                 recepcao, triagem, painel_medico e consulta_medica
@@ -81,9 +82,9 @@ teste trabalho/
 
 ## Entrar no sistema (controle de acesso)
 
-Na **página inicial**, escolha o **perfil** (Recepção, Enfermagem ou Médico) e o **seu nome** e
-clique em *Entrar*. Não há senha. O servidor confere se o profissional existe e está ativo e
-devolve uma sessão. Cada perfil só abre a sua tela e só usa as funções da sua etapa (RNF08):
+Na **página inicial**, escolha o **perfil** (Recepção, Enfermagem ou Médico), digite o seu
+**login** e a sua **senha** e clique em *Entrar*. O servidor procura o login na tabela do perfil,
+confere se o profissional está ativo e se a senha está certa, e devolve uma sessão. Cada perfil só abre a sua tela e só usa as funções da sua etapa (RNF08):
 
 | Perfil | Tela | Pode |
 |---|---|---|
@@ -99,16 +100,19 @@ devolve uma sessão. Cada perfil só abre a sua tela e só usa as funções da s
 - **Cada aba do navegador tem a sua sessão.** Para a demonstração, abra uma aba para cada perfil.
 - As sessões ficam na memória do servidor e duram 12 horas. Ao reiniciar o `node servidor.js`,
   é preciso entrar de novo (o sistema volta sozinho para a página inicial).
-- Como não há senha, qualquer um pode escolher qualquer nome. O controle separa os **perfis**
-  (a recepção não tria, a enfermagem não prescreve), mas não impede alguém de entrar com o
-  nome de outra pessoa. Para isso seria preciso uma senha.
+- **Senhas:** o banco guarda só o *hash* da senha (coluna `senha_hash`), feito com `scrypt`
+  do módulo nativo `crypto` e um sal aleatório por senha (`modulos/senhas.js`). Para gerar o hash
+  de uma senha nova: `node modulos/senhas.js "novaSenha1"` e grave o resultado em `senha_hash`.
+- Login inexistente, profissional inativo e senha errada dão **a mesma mensagem**
+  (*Login ou senha incorretos.*), para não revelar quais logins existem. O login não diferencia
+  maiúsculas; a senha diferencia. A cada entrada, `ultimo_login_em` é atualizado.
 
 ## Roteiro de demonstração
 
 O banco já vem com 6 atendimentos: `AT0001` a `AT0003` triados (VERDE, LARANJA e AMARELO) e
 `AT0004` a `AT0006` aguardando triagem. Abra três abas e, em cada uma, entre com um perfil
-diferente pela página inicial: Recepção (Ana Paula Souza), Enfermagem (Marina Lopes) e
-Médico (Helena Martins).
+diferente pela página inicial (senha `senha123` para todos): Recepção (`ana.souza`),
+Enfermagem (`marina.lopes`) e Médico (`helena.martins`).
 
 1. **Painel do Médico:** a fila aparece na ordem LARANJA → AMARELO → VERDE (e não na ordem de
    chegada). A espera do LARANJA aparece em vermelho, porque passou do tempo-alvo de 10 minutos.
@@ -127,13 +131,14 @@ Médico (Helena Martins).
 
 ### Profissionais cadastrados (`banco/dados_iniciais.sql`)
 
-| Perfil | Nome | Observação |
+| Perfil | Nome (login) | Observação |
 |---|---|---|
-| Recepção | Ana Paula Souza, Bruno Henrique Dias | |
-| Enfermagem | Marina Lopes, Carlos Eduardo Pereira | categoria ENFERMEIRO (podem triar) |
-| Médico | Helena Martins (Clínica Médica), Rafael Costa (Ortopedia) | começam *Em plantão* |
+| Recepção | Ana Paula Souza (`ana.souza`), Bruno Henrique Dias (`bruno.dias`) | |
+| Enfermagem | Marina Lopes (`marina.lopes`), Carlos Eduardo Pereira (`carlos.pereira`) | categoria ENFERMEIRO (podem triar) |
+| Médico | Helena Martins (`helena.martins`, Clínica Médica), Rafael Costa (`rafael.costa`, Ortopedia) | começam *Em plantão* |
 
-Para entrar, escolha o perfil e o nome na página inicial (veja "Entrar no sistema").
+Todos usam a senha de demonstração **`senha123`**. Para entrar, escolha o perfil e digite o login
+e a senha na página inicial (veja "Entrar no sistema").
 
 ## Banco de dados
 
@@ -149,7 +154,8 @@ Os scripts da pasta `banco/` vêm do repositório do grupo e são executados nes
 | `012_historico_status.sql` | histórico de status do atendimento |
 | `013_fluxo_etapas_consulta_desfecho.sql` | consultas, desfechos, histórico de etapas e do médico |
 | `014_numero_atendimento_4_digitos.sql` | número no formato `AT0001` (4 dígitos, como no descritivo) |
-| `dados_iniciais.sql` | profissionais e pacientes de exemplo |
+| `dados_iniciais.sql` | profissionais (com o hash da senha `senha123`) e pacientes de exemplo |
+| `015_senhas_profissionais.sql` | só para banco criado antes da entrada com senha: grava o hash de `senha123` nos profissionais de exemplo |
 
 Modelo conceitual, modelo lógico e dicionário de dados: [docs/MER.md](docs/MER.md),
 [docs/DER.md](docs/DER.md) e [docs/DICIONARIO_DADOS.md](docs/DICIONARIO_DADOS.md).
@@ -164,7 +170,7 @@ A coluna *Perfis* mostra quem pode usar cada rota (*pública* = não precisa de 
 
 | Método | Endereço | Perfis | O que faz |
 |---|---|---|---|
-| POST | `/api/entrar` | pública | entra no sistema: `{ perfil, profissional_id }` → `{ token, perfil, id, nome }` |
+| POST | `/api/entrar` | pública | entra no sistema: `{ perfil, login, senha }` → `{ token, perfil, id, nome }` (400 se o login ou a senha estiverem errados) |
 | GET | `/api/sessao` | todos | quem está logado |
 | POST | `/api/sair` | todos | encerra a sessão |
 | GET | `/api/recepcionistas`, `/api/enfermeiros`, `/api/medicos` | pública | listas de profissionais (para a página inicial) |
@@ -207,8 +213,9 @@ npm test
 
 Os testes (`testes/acesso.test.js`) sobem o servidor numa porta separada (3999) com um banco
 falso em memória, então **não precisam do MySQL**. Eles conferem o controle de acesso de todas
-as rotas (401 sem sessão, 403 para o perfil errado), que o profissional gravado é sempre o da
-sessão e o mascaramento de CPF/RG.
+as rotas (401 sem sessão, 403 para o perfil errado), a entrada com login e senha (hash scrypt,
+senha certa/errada, login inexistente, profissional inativo, mesma mensagem em todas as falhas,
+`ultimo_login_em`), que o profissional gravado é sempre o da sessão e o mascaramento de CPF/RG.
 
 ## Requisitos
 
@@ -224,7 +231,7 @@ sessão e o mascaramento de CPF/RG.
 | RNF04 (integridade referencial) | atendido (chaves estrangeiras e triggers) |
 | RNF05 (bloqueio após a confirmação) | atendido |
 | RNF06 (interface própria por perfil) | atendido (uma tela por perfil) |
-| RNF08 (acesso restrito por perfil) | atendido: sessão por perfil, conferida em toda rota da API (sem senha) |
+| RNF08 (acesso restrito por perfil) | atendido: entrada com login + senha (hash scrypt), sessão por perfil conferida em toda rota da API |
 | RNF09 (acesso controlado a CPF/RG) | atendido: CPF e RG completos só para a recepção; mascarados para os outros perfis |
 
 Lista completa dos requisitos: [docs/requisitos.md](docs/requisitos.md).

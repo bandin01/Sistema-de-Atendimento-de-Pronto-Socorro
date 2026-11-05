@@ -1,26 +1,7 @@
-// Página INICIAL: o profissional escolhe o seu perfil e o seu nome para entrar
-// no sistema. O servidor confere os dados e devolve o token da sessão.
-
-// Lista de profissionais de cada perfil e como cada um aparece na lista.
-let listasPerfil = [];
-listasPerfil['RECEPCAO'] = {
-  endereco: '/api/recepcionistas',
-  texto: function (p) {
-    return p.nome;
-  }
-};
-listasPerfil['ENFERMAGEM'] = {
-  endereco: '/api/enfermeiros',
-  texto: function (p) {
-    return p.nome + ' (COREN-' + p.coren_uf + ' ' + p.coren_numero + ')';
-  }
-};
-listasPerfil['MEDICO'] = {
-  endereco: '/api/medicos',
-  texto: function (p) {
-    return p.nome + ' – ' + p.especialidade;
-  }
-};
+// Página INICIAL: o profissional escolhe o seu perfil e digita o seu login e a
+// sua senha. O servidor confere os dados e devolve o token da sessão.
+// A conferência de verdade (login existe, está ativo, senha certa) é sempre
+// feita no servidor; aqui só se avisa antes de enviar se faltou algum campo.
 
 mostrarSituacao();
 
@@ -36,20 +17,42 @@ function mostrarSituacao() {
   }
 }
 
-elemento('perfil').onchange = function () {
-  let lista = listasPerfil[elemento('perfil').value];
-  if (lista === undefined) {
-    elemento('profissional').innerHTML = '<option value="">Escolha antes o perfil</option>';
-    return;
+// Confere se os campos foram preenchidos. Devolve o texto do erro, ou '' se
+// estiver tudo certo, e coloca o cursor no campo que falta.
+function campoQueFalta(dados) {
+  if (dados.perfil == '') {
+    elemento('perfil').focus();
+    return 'Selecione o seu perfil de acesso.';
   }
-  carregarProfissionais(lista.endereco, 'profissional', lista.texto);
-};
+  if (dados.login.trim() == '') {
+    elemento('login').focus();
+    return 'Digite o seu login.';
+  }
+  if (dados.senha == '') {
+    elemento('senha').focus();
+    return 'Digite a sua senha.';
+  }
+  return '';
+}
 
 elemento('formEntrar').onsubmit = function (evento) {
-  evento.preventDefault();
+  evento.preventDefault();   // impede o envio normal, que recarregaria a página
   let dados = dadosDoFormulario(elemento('formEntrar'));
+  let falta = campoQueFalta(dados);
+  if (falta != '') {
+    mostrarMensagem('msgEntrar', falta, 'erro');
+    return;
+  }
+  mostrarMensagem('msgEntrar', '', '');
+  let botao = elemento('botaoEntrar');
+  botao.disabled = true;               // evita clicar duas vezes enquanto espera
+  botao.textContent = 'Entrando...';
   chamarApi('POST', '/api/entrar', dados, function (erro, sessao) {
     if (erro) {
+      botao.disabled = false;
+      botao.textContent = 'Entrar';
+      elemento('senha').value = '';    // senha errada: apaga para digitar de novo
+      elemento('senha').focus();
       mostrarMensagem('msgEntrar', erro, 'erro');
       return;
     }

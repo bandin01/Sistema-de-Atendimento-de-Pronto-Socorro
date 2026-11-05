@@ -1,51 +1,65 @@
-# changes.md — Controle de acesso por perfil (RNF08) e proteção de CPF/RG (RNF09)
+# changes.md — Entrada no sistema com login e senha (RNF08)
 
 ## Resumo
 
 | Pedido | O que foi feito |
 |---|---|
-| Acesso restrito por perfil (RNF08) | Entrada na página inicial escolhendo **perfil + profissional** (sem senha, decisão do grupo). O servidor cria uma sessão em memória (token aleatório de 48 caracteres, validade de 12 h) e confere o perfil em **toda rota** da API: 401 sem sessão, 403 para perfil sem permissão. |
-| Responsável não pode ser falsificado | O id da recepcionista, do(a) enfermeiro(a) e do médico vem sempre da sessão; o enviado no formulário é ignorado. `GET /api/consulta` deixou de receber `?medico=`. |
-| CPF/RG com acesso controlado (RNF09) | A consulta de um atendimento é liberada para os três perfis, mas CPF e RG só vão completos para a recepção. Enfermagem e médico recebem `***.***.*47-25` e `*****1905`, e `pode_alterar` sempre `false`. |
-| Telas por perfil | Os campos "Profissional responsável" viraram a identificação de quem entrou, com botão *Sair*. Uma tela aberta pelo perfil errado (ou sem sessão) mostra *Acesso restrito*. Sessão expirada (401) volta para a página inicial. |
-| Testes | `testes/acesso.test.js` (`npm test`): 12 testes com banco falso, sem precisar do MySQL. |
+| O professor exigiu senha para entrar | A página inicial pede **perfil + login + senha**, e não mais perfil + nome escolhido numa lista. O servidor procura o login (com `ativo = 1`) na tabela do perfil e confere a senha com o hash guardado em `senha_hash`. Depois grava `ultimo_login_em`. |
+| Senha guardada com segurança | O banco guarda só o hash **scrypt** da senha, com um sal aleatório para cada senha, no formato `scrypt$<sal>$<hash>`. Usa o módulo nativo `crypto`, sem nenhuma dependência nova. A comparação é feita com `timingSafeEqual`. |
+| Não revelar quais logins existem | Login inexistente, login de outro perfil, profissional inativo, senha errada e senha com mais de 72 caracteres dão todos a mesma resposta: **400 *Login ou senha incorretos.*** Quando o login não existe, a senha é conferida mesmo assim, contra um hash qualquer, para a resposta demorar o mesmo tempo. |
+| Visual da página de entrada | O formulário virou um cartão, com os campos um embaixo do outro, destaque no campo selecionado, mensagem de erro dentro do cartão e o botão mostrando *Entrando...* enquanto espera. As cores são as que o site já usa. |
+| Dados de exemplo | Os 6 profissionais de exemplo têm a senha **`senha123`**. Os logins são `ana.souza`, `bruno.dias`, `marina.lopes`, `carlos.pereira`, `helena.martins` e `rafael.costa`. |
 
-## Permissões das rotas
+**Não houve mudança na estrutura do banco.** As colunas `login`, `senha_hash` e `ultimo_login_em` já existiam (script 010). Só não eram usadas.
 
-| Rota | Perfis |
-|---|---|
-| `POST /api/entrar`, `GET /api/recepcionistas`, `/api/enfermeiros`, `/api/medicos` | pública |
-| `GET /api/sessao`, `POST /api/sair`, `GET /api/atendimentos?numero=` | todos (CPF/RG mascarados fora da recepção) |
-| `GET /api/atendimentos` (lista), `POST /api/atendimentos`, `/alterar`, `/cancelar` | Recepção |
-| `GET /api/triagem/fila`, `POST /api/triagem` | Enfermagem |
-| `GET /api/painel`, `POST /api/painel/chamar`, `GET /api/consulta`, `POST /api/consulta/prescricao`, `/finalizar` | Médico |
+## Decisões (combinadas com o usuário)
+
+- **scrypt nativo** em vez de bcrypt: o projeto usa só módulos nativos do Node, além do `mysql2`. O `requisitos_extensao_profissionais.md` cita bcrypt, mas para este uso o scrypt é igualmente seguro.
+- O usuário digita **só o login** (não o e-mail). O login não diferencia maiúsculas: ele é padronizado com `trim` + `toLowerCase`, como a regra `^[a-z0-9._-]{3,60}$` do banco. A senha diferencia maiúsculas.
+- O **seletor de perfil continua**: o servidor procura só na tabela do perfil escolhido.
+- Login errado responde **400, e não 401**: no front-end, `chamarApi` trata o 401 como "sessão expirada" e manda o usuário de volta à página inicial.
 
 ## Arquivos
 
 **Back-end**
-- `modulos/sessoes.js` (novo): `entrar`, `identificar`, `sair` e `nomePerfil`. Os tokens são validados pelo formato (`^[0-9a-f]{48}$`) antes da busca, o que recusa chaves como `__proto__`.
-- `servidor.js`: tabela `permissoes[...]` ao lado de `rotas[...]`. As rotas recebem `(consulta, dados, sessao, callback)`. A sessão é conferida antes de ler o corpo. O responsável é sobrescrito com `sessao.id`. O corpo JSON precisa ser um objeto: `null` ou número dão 400 em vez de derrubar o servidor. A porta pode ser trocada por `PORTA`, o que é usado nos testes.
-- `modulos/atendimentos.js`: `consultar(numero, perfil, callback)` mascara CPF/RG fora da recepção.
-- `modulos/utilitarios.js`: `mascararCpf` e `mascararRg`.
+- `modulos/senhas.js` (novo): `gerarHash(senha, callback)` e `conferir(senha, gravado, callback)`. Um valor fora do formato, como o antigo `'login-nao-utilizado'`, nunca confere. Para gerar um hash pelo terminal: `node modulos/senhas.js "novaSenha1"`.
+- `modulos/sessoes.js`: `entrar` recebe `{ perfil, login, senha }` em vez de `{ perfil, profissional_id }`. Mensagens de campo vazio: *Selecione o seu perfil.*, *Digite o seu login.* e *Digite a sua senha.* Senha que não é texto conta como vazia.
+- `servidor.js`: sem mudança. A rota `POST /api/entrar` continua pública e repassa os dados para `sessoes.entrar`.
+
+**Banco**
+- `banco/dados_iniciais.sql`: `senha_hash` com o hash scrypt de `senha123`, um sal diferente para cada profissional. O comentário do cabeçalho foi atualizado.
+- `banco/015_senhas_profissionais.sql` (novo): serve **só para quem já tinha o banco criado**. Grava os hashes nos profissionais de exemplo que ainda têm `senha_hash = 'login-nao-utilizado'`. Em banco novo não altera nada.
+- `banco/script_completo.sql`: os mesmos hashes nos dados iniciais e o 015 no final.
 
 **Front-end**
-- `index.html` + `javascripts/inicio.js` (novo): formulário *Entrar* (perfil e profissional) e, para quem já entrou, o nome, o link *Abrir a minha área* e *Sair*.
-- `javascripts/comum.js`: sessão no `sessionStorage` (uma por aba), `exigirPerfil`, `sair`, cabeçalho `X-Sessao` em `chamarApi`, tratamento do 401. Saiu `lerParametro`, que não era mais usado.
-- `HTMLs/*.html` e `javascripts/recepcao.js`, `triagem.js`, `painel_medico.js`, `consulta_medica.js`: tiram os `<select>` de profissional e o `?medico=` dos links, e passam a chamar `exigirPerfil`.
+- `index.html`: o campo *Profissional* deu lugar aos campos *Login* e *Senha* (`autocomplete="username"` / `"current-password"`). A mensagem de erro fica dentro do formulário. O formulário tem `novalidate`, porque o `inicio.js` mostra as mensagens.
+- `javascripts/inicio.js`: não carrega mais as listas de profissionais. Avisa qual campo falta antes de enviar. Desativa o botão enquanto espera. Em caso de erro, apaga a senha e coloca o cursor nela.
+- `CSSs/estilo.css`: classes `section.cartao-entrar` e `form.entrar`. As outras telas não mudam.
 
-**Documentação e outros**
-- `README.md`: seção "Entrar no sistema", roteiro de demonstração com uma aba por perfil, tabela da API com perfis e códigos 401/403, seção "Testes", RNF08 e RNF09 como atendidos.
-- `CLAUDE.md`: regras novas (toda rota precisa de `permissoes[...]` e de entrada no teste, e o responsável vem da sessão). RNF08/RNF09 saem de "pendentes".
-- `banco/dados_iniciais.sql` e `banco/script_completo.sql`: só o comentário sobre login. **Nenhuma mudança de estrutura ou de dados no banco.**
-- `package.json`: script `test`.
+**Testes**: `testes/acesso.test.js`
+- O banco falso agora tem login, `senha_hash` e `ativo`, além de um profissional inativo e de um cadastro antigo sem hash. Os tokens dos testes são obtidos entrando com login e senha.
+- Testes novos: `senhas` (formato, sal diferente, senha certa e errada, valores inválidos), `entrar: campos obrigatórios`, `entrar: falhas dão sempre a mesma resposta`, `entrar: sucesso…` (login com maiúsculas e espaços, resposta sem `senha_hash`, o banco recebe só o login, `UPDATE … ultimo_login_em`) e `entrar: o antigo jeito… não funciona mais`.
+
+**Documentação**
+- `README.md`: seção *Entrar no sistema*, roteiro de demonstração com os logins, tabela de profissionais com login e senha, script 015, rota `/api/entrar`, RNF08 e seção *Testes*.
+- `CLAUDE.md`: `senhas.js` na estrutura. A regra "sem senha (decisão do grupo)" passou a ser "perfil + login + senha (exigência do professor)".
+- `docs/DER.md`, `docs/MER.md` e `docs/DICIONARIO_DADOS.md`: descrevem a entrada com senha e o formato do `senha_hash` (o dicionário dizia bcrypt).
 
 ## Validação
 
-- `npm test`: 12/12 passando.
-- Teste de mutação: removi a permissão da triagem, o mascaramento e o uso do enfermeiro da sessão, e liberei o painel para a recepção, um de cada vez. Em todos os casos algum teste falhou.
-- O servidor real sobe, entrega as páginas e responde 401 nas rotas protegidas.
-- **Não validado contra um MySQL real** (sem acesso ao banco nesta máquina). Vale rodar o roteiro de demonstração do README.
+- `npm test`: **18/18 passando**.
+- Teste de mutação: estraguei de propósito uma coisa de cada vez (não conferir a senha, aceitar inativo, não padronizar o login, não gravar `ultimo_login_em`, mensagem diferente para senha longa). Em todos os casos algum teste falhou.
+- Os 6 hashes gravados no SQL foram conferidos com `modulos/senhas.js`: aceitam `senha123` e recusam `senha124`.
+- O servidor real sobe, entrega a página e responde 400 quando falta a senha.
+- **Validado contra o MySQL 9.6 real**, num banco que já existia (6 atendimentos):
+  - o `015_senhas_profissionais.sql` gravou o hash nos 6 profissionais, sem apagar nenhum dado;
+  - com o servidor real, cada perfil entrou com `senha123` (`ana.souza`, `marina.lopes` e `helena.martins`) e conseguiu usar a sua tela (`/api/atendimentos`, `/api/triagem/fila` e `/api/painel`);
+  - senha errada, login de outro perfil e login inexistente deram 400 com *Login ou senha incorretos.*;
+  - login em maiúsculas também entrou;
+  - `ultimo_login_em` foi gravado no banco.
+- O `script_completo.sql` (banco criado do zero) não foi executado nesta validação. Ele usa os mesmos hashes já conferidos.
 
-## Limitação conhecida
+## Pendências / próximos passos possíveis
 
-Sem senha, os perfis ficam separados, mas qualquer pessoa pode entrar com o nome de outra. As colunas `login` e `senha_hash` continuam no banco caso o grupo decida usar senha.
+- As rotas públicas `GET /api/recepcionistas`, `/api/enfermeiros` e `/api/medicos`, e a função `carregarProfissionais` do `comum.js`, eram usadas só pela antiga lista de nomes da página inicial e agora ficaram sem uso. Foram mantidas para não ampliar a mudança. Podem ser removidas ou protegidas depois.
+- Não há tela para trocar a senha nem limite de tentativas erradas.
