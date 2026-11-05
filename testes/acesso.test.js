@@ -310,10 +310,12 @@ test('entrar: o antigo jeito (só perfil + id do profissional) não funciona mai
   assert.strictEqual(r.corpo.token, undefined);
 });
 
-test('rotas públicas funcionam sem sessão', async function () {
+test('as listas de profissionais não existem mais (ninguém vê os nomes sem entrar)', async function () {
   for (let endereco of ['/api/recepcionistas', '/api/enfermeiros', '/api/medicos']) {
     let r = await api('GET', endereco);
-    assert.strictEqual(r.status, 200, endereco);
+    assert.strictEqual(r.status, 404, endereco);
+    r = await api('GET', endereco, undefined, tokens['RECEPCAO']);
+    assert.strictEqual(r.status, 404, endereco + ' com sessão');
   }
 });
 

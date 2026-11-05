@@ -88,7 +88,7 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | crm_numero | VARCHAR(10) | NÃO | UK (com crm_uf) | | Só dígitos. |
 | crm_uf | CHAR(2) | NÃO | UK (com crm_numero) | | UF válida. |
 | especialidade | VARCHAR(100) | NÃO | | | |
-| status_operacional | ENUM status operacional | NÃO | | `FOLGA` | Situação do médico no plantão. `EM_CONSULTA` só é definido pelo sistema. Inativo só em `FOLGA`/`LICENCA` (`chk_medicos_inativo_fora_do_plantao`). Toda mudança vai para `historico_status_medico`. O médico altera no Painel (`POST /api/painel/situacao`), exceto `EM_CONSULTA`. Na API: campo `status_operacional` (`GET /api/medicos`, `GET /api/painel`). |
+| status_operacional | ENUM status operacional | NÃO | | `FOLGA` | Situação do médico no plantão. `EM_CONSULTA` só é definido pelo sistema. Inativo só em `FOLGA`/`LICENCA` (`chk_medicos_inativo_fora_do_plantao`). Toda mudança vai para `historico_status_medico`. O médico altera no Painel (`POST /api/painel/situacao`), exceto `EM_CONSULTA`. Na API: campo `status_operacional` (`GET /api/painel`). |
 | login | VARCHAR(60) | NÃO | UK | | Único entre as três tabelas. |
 | senha_hash | VARCHAR(255) | NÃO | | | Hash scrypt da senha (como em recepcionistas). |
 | ativo | TINYINT(1) | NÃO | | 1 | |
