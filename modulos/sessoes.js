@@ -1,12 +1,14 @@
 // Módulo de SESSÕES: controle de acesso por perfil (RNF08).
-// Na página inicial o profissional escolhe o seu perfil e o seu nome. O
-// servidor confere no banco se ele existe e está ativo, e devolve um "token"
+// Na página inicial o profissional escolhe o seu perfil e digita o seu login e
+// a sua senha. O servidor procura o login na tabela do perfil, confere se o
+// profissional está ativo e se a senha está certa, e devolve um "token"
 // (um código aleatório). O navegador envia esse token em toda chamada à API,
 // no cabeçalho X-Sessao, e o servidor descobre por ele quem está usando o
 // sistema e qual é o seu perfil.
 let crypto = require('crypto');
 let banco = require('./banco');
 let util = require('./utilitarios');
+let senhas = require('./senhas');
 
 // Cada perfil corresponde a uma tabela de profissionais.
 let tabelas = [];
@@ -30,32 +32,63 @@ exports.nomePerfil = function (perfil) {
   return nomesPerfil[perfil];
 };
 
-// ENTRAR: dados = { perfil, profissional_id }. Devolve { token, perfil, id, nome }.
+// Resposta única para login inexistente, profissional inativo e senha errada:
+// assim quem tenta adivinhar não descobre quais logins existem.
+let mensagemFalha = 'Login ou senha incorretos.';
+
+// Hash qualquer, usado quando o login não existe: a senha é conferida mesmo
+// assim, para a resposta demorar o mesmo tempo nos dois casos.
+let hashDeMentira = 'scrypt$' + '0'.repeat(32) + '$' + '0'.repeat(128);
+
+// ENTRAR: dados = { perfil, login, senha }. Devolve { token, perfil, id, nome }.
 exports.entrar = function (dados, callback) {
   let perfil = util.texto(dados.perfil).toUpperCase();
-  let profissionalId = parseInt(dados.profissional_id, 10);
+  let login = util.texto(dados.login).toLowerCase();
+  let senha = (typeof dados.senha == 'string') ? dados.senha : '';
   if (tabelas[perfil] === undefined) {
     return callback(util.erro(400, 'Selecione o seu perfil.'));
   }
-  if (isNaN(profissionalId)) {
-    return callback(util.erro(400, 'Selecione o seu nome.'));
+  if (login == '') {
+    return callback(util.erro(400, 'Digite o seu login.'));
   }
-  let sql = 'SELECT id, nome FROM ' + tabelas[perfil] + ' WHERE id = ? AND ativo = 1';
-  banco.executar(sql, [profissionalId], function (err, linhas) {
+  if (senha == '') {
+    return callback(util.erro(400, 'Digite a sua senha.'));
+  }
+  // Senhas válidas têm no máximo 72 caracteres (RN16.3). Uma maior nem é
+  // conferida, para ninguém ocupar o servidor com textos enormes.
+  if (senha.length > 72) {
+    return callback(util.erro(400, mensagemFalha));
+  }
+  let sql = 'SELECT id, nome, senha_hash FROM ' + tabelas[perfil] + ' WHERE login = ? AND ativo = 1';
+  banco.executar(sql, [login], function (err, linhas) {
     if (err) {
       return callback(err);
     }
-    if (linhas.length == 0) {
-      return callback(util.erro(400, 'Profissional não encontrado ou inativo neste perfil.'));
-    }
-    let token = crypto.randomBytes(24).toString('hex');
-    sessoes[token] = {
-      perfil: perfil,
-      id: linhas[0].id,
-      nome: linhas[0].nome,
-      expiraEm: Date.now() + duracaoMinutos * 60 * 1000
-    };
-    callback(null, { token: token, perfil: perfil, id: linhas[0].id, nome: linhas[0].nome });
+    let gravado = (linhas.length == 0) ? hashDeMentira : linhas[0].senha_hash;
+    senhas.conferir(senha, gravado, function (err, confere) {
+      if (err) {
+        return callback(err);
+      }
+      if (linhas.length == 0 || !confere) {
+        return callback(util.erro(400, mensagemFalha));
+      }
+      let profissional = linhas[0];
+      // Guarda a data e a hora do último acesso (coluna ultimo_login_em).
+      let sqlAcesso = 'UPDATE ' + tabelas[perfil] + ' SET ultimo_login_em = NOW() WHERE id = ?';
+      banco.executar(sqlAcesso, [profissional.id], function (err) {
+        if (err) {
+          return callback(err);
+        }
+        let token = crypto.randomBytes(24).toString('hex');
+        sessoes[token] = {
+          perfil: perfil,
+          id: profissional.id,
+          nome: profissional.nome,
+          expiraEm: Date.now() + duracaoMinutos * 60 * 1000
+        };
+        callback(null, { token: token, perfil: perfil, id: profissional.id, nome: profissional.nome });
+      });
+    });
   });
 };
 

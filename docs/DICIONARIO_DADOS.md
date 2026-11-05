@@ -6,7 +6,7 @@ Estado após os scripts `001`, `010`, `011`, `012`, `013` e `014` (pasta `banco/
 Legenda: **Nulo** `NÃO` = `NOT NULL` · **Chave** PK primária, FK estrangeira, UK única · *(s)* dado sensível com máscara por perfil na API (RNF09/RNF11).
 Todas as FKs são `ON UPDATE RESTRICT ON DELETE RESTRICT`.
 
-> **Observação:** nesta versão do sistema, "API" é o back-end em Node.js da pasta `modulos/`. Regras citadas aqui que dependiam do back-end original do repositório (login, cadastro de profissionais pela API, máscara de CPF/RG por perfil) não fazem parte desta versão simplificada; veja o `README.md`.
+> **Observação:** nesta versão do sistema, "API" é o back-end em Node.js da pasta `modulos/`. A entrada com login e senha está implementada em `modulos/sessoes.js` e `modulos/senhas.js`. Regras citadas aqui que dependiam do back-end original do repositório (cadastro de profissionais pela API) não fazem parte desta versão simplificada; veja o `README.md`.
 
 ## Visão geral
 
@@ -68,9 +68,9 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | telefone | VARCHAR(11) | SIM | | | DDD + número, 10 ou 11 dígitos. |
 | email | VARCHAR(150) | NÃO | UK | | |
 | login | VARCHAR(60) | NÃO | UK | | `^[a-z0-9._-]{3,60}$`, único entre as três tabelas de profissionais. |
-| senha_hash | VARCHAR(255) | NÃO | | | bcrypt (RNF13). |
+| senha_hash | VARCHAR(255) | NÃO | | | Hash scrypt da senha, `scrypt$<sal>$<hash>` (`modulos/senhas.js`, RNF13). Nunca a senha em si. |
 | ativo | TINYINT(1) | NÃO | | 1 | 0 = desativado (nunca é excluído). |
-| ultimo_login_em | DATETIME | SIM | | | |
+| ultimo_login_em | DATETIME | SIM | | | Atualizado a cada entrada no sistema. |
 | criado_em | DATETIME | NÃO | | CURRENT_TIMESTAMP | |
 | atualizado_em | DATETIME | NÃO | | CURRENT_TIMESTAMP ON UPDATE | |
 
@@ -90,9 +90,9 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | especialidade | VARCHAR(100) | NÃO | | | |
 | status_operacional | ENUM status operacional | NÃO | | `FOLGA` | Situação do médico no plantão. `EM_CONSULTA` só é definido pelo sistema. Inativo só em `FOLGA`/`LICENCA` (`chk_medicos_inativo_fora_do_plantao`). Toda mudança vai para `historico_status_medico`. O médico altera no Painel (`POST /api/painel/situacao`), exceto `EM_CONSULTA`. Na API: campo `status_operacional` (`GET /api/medicos`, `GET /api/painel`). |
 | login | VARCHAR(60) | NÃO | UK | | Único entre as três tabelas. |
-| senha_hash | VARCHAR(255) | NÃO | | | |
+| senha_hash | VARCHAR(255) | NÃO | | | Hash scrypt da senha (como em recepcionistas). |
 | ativo | TINYINT(1) | NÃO | | 1 | |
-| ultimo_login_em | DATETIME | SIM | | | |
+| ultimo_login_em | DATETIME | SIM | | | Atualizado a cada entrada no sistema. |
 | criado_em | DATETIME | NÃO | | CURRENT_TIMESTAMP | |
 | atualizado_em | DATETIME | NÃO | | CURRENT_TIMESTAMP ON UPDATE | |
 
@@ -115,9 +115,9 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | especialidade | VARCHAR(100) | SIM | | | |
 | status_disponibilidade | ENUM disponibilidade | NÃO | | `INDISPONIVEL` | Inativo só `INDISPONIVEL`. O próprio enfermeiro altera na tela de Triagem; só registra triagem quando `DISPONIVEL` (regra da aplicação). |
 | login | VARCHAR(60) | NÃO | UK | | Único entre as três tabelas. |
-| senha_hash | VARCHAR(255) | NÃO | | | |
+| senha_hash | VARCHAR(255) | NÃO | | | Hash scrypt da senha (como em recepcionistas). |
 | ativo | TINYINT(1) | NÃO | | 1 | |
-| ultimo_login_em | DATETIME | SIM | | | |
+| ultimo_login_em | DATETIME | SIM | | | Atualizado a cada entrada no sistema. |
 | criado_em | DATETIME | NÃO | | CURRENT_TIMESTAMP | |
 | atualizado_em | DATETIME | NÃO | | CURRENT_TIMESTAMP ON UPDATE | |
 

@@ -17,7 +17,7 @@ O modelo lógico (tabelas, colunas, chaves, `NOT NULL`) está em [DER.md](DER.md
 
 | Categoria | Entidades | Papel no modelo |
 |---|---|---|
-| **Atores** | Paciente, Recepcionista, Enfermeiro, Médico | Pessoas que participam do processo. O perfil de acesso vem da entidade em que o profissional está (não há entidade "usuário"): ao entrar, ele escolhe o perfil e o próprio nome, e o sistema confere se está ativo naquela entidade. |
+| **Atores** | Paciente, Recepcionista, Enfermeiro, Médico | Pessoas que participam do processo. O perfil de acesso vem da entidade em que o profissional está (não há entidade "usuário"): ao entrar, ele escolhe o perfil e digita login e senha, e o sistema confere se o login existe e está ativo naquela entidade e se a senha confere com o hash guardado. |
 | **Etapas do processo** | Atendimento *(Atendimento Inicial)*, Triagem, Consulta, Desfecho | Passos do fluxo do paciente. Cada etapa clínica aponta para o ator responsável por ela. |
 | **Itens de etapa** | Prescrição | Detalhe do desfecho/consulta: um registro por medicamento. |
 | **Rastreabilidade** | Histórico de Status, Histórico de Etapas, Histórico de Status do Médico | Trilhas de auditoria. Nunca são alteradas pela aplicação. |
@@ -121,7 +121,7 @@ Legenda: **sublinhado** = identificador · *(s)* = dado sensível (RNF09) · *(o
 
 O `login` é único dentro de cada entidade e também entre as três (não existem dois profissionais com o mesmo login).
 
-> **Nesta versão do sistema** a entrada é feita escolhendo o perfil e o nome, sem senha (veja o `README.md`). Os atributos `login`, `senha_hash` e `ultimo_login_em` continuam no modelo e no banco (`login` e `senha_hash` são obrigatórios e preenchidos com valores fixos em `dados_iniciais.sql`), mas a aplicação não os usa.
+> **Entrada no sistema:** perfil + `login` + senha (veja o `README.md`). A senha nunca é guardada, só o seu hash (`senha_hash`, scrypt com sal). A cada entrada o sistema atualiza `ultimo_login_em`.
 
 O **status operacional do médico** pertence ao Médico, não ao Atendimento. `EM_PLANTAO` permite chamar pacientes, `EM_CONSULTA` só o sistema define (ao chamar o paciente), e `PAUSA`, `FOLGA` e `LICENCA` são situações de escala (plantão, pausa, folga, licença). Médico desativado fica em `FOLGA` ou `LICENCA`.
 

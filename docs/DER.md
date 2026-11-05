@@ -6,7 +6,7 @@ O modelo conceitual está em [MER.md](MER.md) e a descrição de cada coluna em 
 
 Recepcionistas, médicos e enfermeiros ficam em tabelas separadas, cada uma com o próprio `login` e `senha_hash`. Não existe tabela `usuarios`: o perfil de acesso é definido pela tabela onde o profissional está.
 
-> **Nesta versão do sistema** a entrada é feita escolhendo o perfil e o nome, sem senha: o servidor só confere `id` e `ativo = 1` na tabela do perfil (`modulos/sessoes.js`). As colunas `login`, `senha_hash` e `ultimo_login_em` continuam no banco, com as mesmas restrições, mas a aplicação não as lê nem grava. `login` e `senha_hash` recebem valores fixos em `dados_iniciais.sql`.
+> **Entrada no sistema:** o profissional escolhe o perfil e digita `login` e senha. O servidor (`modulos/sessoes.js`) procura `login` com `ativo = 1` na tabela do perfil, confere a senha com o `senha_hash` (scrypt, formato `scrypt$<sal>$<hash>`, `modulos/senhas.js`) e grava `ultimo_login_em`. Os profissionais de exemplo usam a senha `senha123`; bancos criados antes desta mudança recebem os hashes pelo script `015_senhas_profissionais.sql`.
 
 O fluxo **Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho** é modelado com uma tabela por etapa: `atendimentos` → `triagens` → `consultas` → `desfechos`. A tabela `atendimentos` não guarda nada do médico: o vínculo fica em `consultas`, e o status operacional do médico fica em `medicos.status_operacional`.
 

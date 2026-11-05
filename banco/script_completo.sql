@@ -2,7 +2,7 @@
 -- script_completo.sql
 -- -----------------------------------------------------------------------------
 -- Cria o banco pronto_socorro inteiro de uma vez: é a junção, na ordem certa,
--- dos arquivos desta pasta (000, 001, 010, 011, 012, 013, 014 e dados_iniciais).
+-- dos arquivos desta pasta (000, 001, 010, 011, 012, 013, 014, dados_iniciais e 015).
 -- Os arquivos numerados continuam aqui como referência.
 --
 -- MySQL Workbench: File > Open SQL Script > este arquivo > executar (raio).
@@ -1104,10 +1104,10 @@ DELIMITER ;
 -- Profissionais do plantão e alguns pacientes de exemplo para demonstração.
 -- Executar DEPOIS dos scripts 000 a 014.
 --
--- Observação: o profissional entra no sistema escolhendo o perfil e o nome na
--- página inicial (sem senha). As colunas login e senha_hash fazem parte da
--- modelagem original do banco e são obrigatórias, por isso são preenchidas
--- com valores fixos.
+-- Entrada no sistema: perfil + login + senha. Todos os profissionais de
+-- exemplo usam a senha  senha123  (só para demonstração). A coluna senha_hash
+-- guarda o hash scrypt da senha (modulos/senhas.js), nunca a senha em si.
+-- Para gerar o hash de outra senha:  node modulos/senhas.js "novaSenha1"
 -- =============================================================================
 
 USE pronto_socorro;
@@ -1116,22 +1116,22 @@ USE pronto_socorro;
 -- PROFISSIONAIS
 -- -----------------------------------------------------------------------------
 INSERT INTO recepcionistas (nome, cpf, rg, data_nascimento, telefone, email, login, senha_hash) VALUES
-  ('Ana Paula Souza',     '52998224725', '284731905', '1992-04-10', '19991234567', 'ana.souza@exemplo.com',  'ana.souza',  'login-nao-utilizado'),
-  ('Bruno Henrique Dias', '11144477735', '193847562', '1988-09-22', '19992345678', 'bruno.dias@exemplo.com', 'bruno.dias', 'login-nao-utilizado');
+  ('Ana Paula Souza',     '52998224725', '284731905', '1992-04-10', '19991234567', 'ana.souza@exemplo.com',  'ana.souza',  'scrypt$f59e5e76677a5f5229491a76e7ea8f10$98f431f6e18e6ac29e550f6b293e2b0b8b6f84701b094dd15cd00f9cd7f6561d41589c32d9bbe81ca25b36e19bac5ddbd2739bf317d52191e6206d3d909cbcbb'),
+  ('Bruno Henrique Dias', '11144477735', '193847562', '1988-09-22', '19992345678', 'bruno.dias@exemplo.com', 'bruno.dias', 'scrypt$7d60525d07c690785a61dde70fd7970e$c5dbb1f15ea61d045e9f39e15758e7a1b4817b8b87d92554dddf1f68cf6151a53d18bc94e3d910c82b4bfde7daeb16ec3994de256c0b6152ee45f592260360fe');
 
 INSERT INTO enfermeiros (nome, cpf, rg, data_nascimento, telefone, email, coren_numero, coren_uf, categoria,
                          especialidade, status_disponibilidade, login, senha_hash) VALUES
   ('Marina Lopes',           '39053344705', '374829105', '1990-02-14', '19993456789', 'marina.lopes@exemplo.com',
-   '123456', 'SP', 'ENFERMEIRO', 'Urgência e Emergência', 'DISPONIVEL', 'marina.lopes', 'login-nao-utilizado'),
+   '123456', 'SP', 'ENFERMEIRO', 'Urgência e Emergência', 'DISPONIVEL', 'marina.lopes', 'scrypt$e179fc261167dbf4a58f7f9b910cc949$5291d6c248a429ea7872eb3720c8b2eb6235843533d7c1dcd90adbe84e0200c6e10fb19064288cd5475afe9c8ef139d40adf6e50331d42c974de3c116547e3ff'),
   ('Carlos Eduardo Pereira', '12345678909', '465738291', '1985-07-03', '19994567890', 'carlos.pereira@exemplo.com',
-   '234567', 'SP', 'ENFERMEIRO', NULL, 'DISPONIVEL', 'carlos.pereira', 'login-nao-utilizado');
+   '234567', 'SP', 'ENFERMEIRO', NULL, 'DISPONIVEL', 'carlos.pereira', 'scrypt$6c830a9570b6232af7e0fa5b356c7a77$b6c2bd1b8191b76617b37d43c40bd909958ab3c7ac97ce55b3cab5b536514d114cfd87c0e3f9a5804faf725f70575f954b6191ab2d8906c870a01d359459b8f5');
 
 INSERT INTO medicos (nome, cpf, rg, data_nascimento, telefone, email, crm_numero, crm_uf, especialidade,
                      status_operacional, login, senha_hash) VALUES
   ('Helena Martins', '98765432100', '556473829', '1980-11-30', '19995678901', 'helena.martins@exemplo.com',
-   '112233', 'SP', 'Clínica Médica', 'EM_PLANTAO', 'helena.martins', 'login-nao-utilizado'),
+   '112233', 'SP', 'Clínica Médica', 'EM_PLANTAO', 'helena.martins', 'scrypt$3d22630c65424a8926da7a6fee0aab0f$cb5707ac020c21c858aa4b5a38af51ee47e06e415fd2914ef5956d192e06f99d4b75c1f705baa7ef4b6345214b257fc140a48d5ddb01f4825a59ca29ea5505b1'),
   ('Rafael Costa',   '24681357928', '647382910', '1978-05-18', '19996789012', 'rafael.costa@exemplo.com',
-   '445566', 'SP', 'Ortopedia',      'EM_PLANTAO', 'rafael.costa',   'login-nao-utilizado');
+   '445566', 'SP', 'Ortopedia',      'EM_PLANTAO', 'rafael.costa',   'scrypt$7f946a8856d91df5e89edf3c0eee3064$1f529ad7e936088ccd4a1090948d60653e6b16a4715edff12d9422c735379c2fd5397d4dbcc25bc546925d538ec7f347f612f78e8fc433677ba93a2c382d7679');
 
 SET @recepcionista = (SELECT id FROM recepcionistas WHERE login = 'ana.souza');
 SET @enfermeiro    = (SELECT id FROM enfermeiros    WHERE login = 'marina.lopes');
@@ -1217,3 +1217,30 @@ SELECT t.atendimento_id, 'TRIAGEM',
        CONCAT('Triagem realizada por Marina Lopes: classificação ', t.classificacao_manchester, '.'),
        t.realizada_em
   FROM triagens t;
+
+-- >>>>>>>>>>>>>>>>>>>> 015_senhas_profissionais.sql <<<<<<<<<<<<<<<<<<<<
+
+-- =============================================================================
+-- 015_senhas_profissionais.sql
+-- -----------------------------------------------------------------------------
+-- A entrada no sistema passa a exigir login + senha (RNF08). A estrutura não
+-- muda: as colunas login, senha_hash e ultimo_login_em já existiam (010).
+-- Este script só serve para bancos criados ANTES desta mudança, cujos
+-- profissionais de exemplo têm senha_hash = 'login-nao-utilizado': ele grava
+-- o hash scrypt da senha de demonstração  senha123  para cada um deles.
+-- Em banco novo (script_completo.sql) não altera nada, pois os dados
+-- iniciais já vêm com os hashes.
+-- =============================================================================
+
+UPDATE recepcionistas SET senha_hash = 'scrypt$f59e5e76677a5f5229491a76e7ea8f10$98f431f6e18e6ac29e550f6b293e2b0b8b6f84701b094dd15cd00f9cd7f6561d41589c32d9bbe81ca25b36e19bac5ddbd2739bf317d52191e6206d3d909cbcbb'
+ WHERE login = 'ana.souza' AND senha_hash = 'login-nao-utilizado';
+UPDATE recepcionistas SET senha_hash = 'scrypt$7d60525d07c690785a61dde70fd7970e$c5dbb1f15ea61d045e9f39e15758e7a1b4817b8b87d92554dddf1f68cf6151a53d18bc94e3d910c82b4bfde7daeb16ec3994de256c0b6152ee45f592260360fe'
+ WHERE login = 'bruno.dias' AND senha_hash = 'login-nao-utilizado';
+UPDATE enfermeiros SET senha_hash = 'scrypt$e179fc261167dbf4a58f7f9b910cc949$5291d6c248a429ea7872eb3720c8b2eb6235843533d7c1dcd90adbe84e0200c6e10fb19064288cd5475afe9c8ef139d40adf6e50331d42c974de3c116547e3ff'
+ WHERE login = 'marina.lopes' AND senha_hash = 'login-nao-utilizado';
+UPDATE enfermeiros SET senha_hash = 'scrypt$6c830a9570b6232af7e0fa5b356c7a77$b6c2bd1b8191b76617b37d43c40bd909958ab3c7ac97ce55b3cab5b536514d114cfd87c0e3f9a5804faf725f70575f954b6191ab2d8906c870a01d359459b8f5'
+ WHERE login = 'carlos.pereira' AND senha_hash = 'login-nao-utilizado';
+UPDATE medicos SET senha_hash = 'scrypt$3d22630c65424a8926da7a6fee0aab0f$cb5707ac020c21c858aa4b5a38af51ee47e06e415fd2914ef5956d192e06f99d4b75c1f705baa7ef4b6345214b257fc140a48d5ddb01f4825a59ca29ea5505b1'
+ WHERE login = 'helena.martins' AND senha_hash = 'login-nao-utilizado';
+UPDATE medicos SET senha_hash = 'scrypt$7f946a8856d91df5e89edf3c0eee3064$1f529ad7e936088ccd4a1090948d60653e6b16a4715edff12d9422c735379c2fd5397d4dbcc25bc546925d538ec7f347f612f78e8fc433677ba93a2c382d7679'
+ WHERE login = 'rafael.costa' AND senha_hash = 'login-nao-utilizado';

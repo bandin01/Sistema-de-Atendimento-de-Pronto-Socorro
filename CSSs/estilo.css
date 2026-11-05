@@ -148,6 +148,41 @@ form.linha {
   align-items: flex-end;
 }
 
+/* Cartão "Entrar no sistema" da página inicial: campos um embaixo do outro,
+   numa coluna estreita, com uma faixa colorida em cima. */
+section.cartao-entrar {
+  border-top: 5px solid #0b6e8a;
+}
+
+form.entrar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 380px;
+}
+
+form.entrar input,
+form.entrar select {
+  padding: 10px;
+}
+
+/* Destaque ao clicar num campo */
+form.entrar input:focus,
+form.entrar select:focus {
+  outline: none;
+  border-color: #0b6e8a;
+  box-shadow: 0 0 0 3px rgba(11, 110, 138, 0.2);
+}
+
+form.entrar .mensagem {
+  margin: 0;
+}
+
+form.entrar button {
+  padding: 12px;
+  font-weight: bold;
+}
+
 fieldset {
   grid-column: 1 / -1;
   border: 1px solid #cbd2d9;
