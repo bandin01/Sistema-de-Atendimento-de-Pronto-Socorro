@@ -12,7 +12,6 @@ let url = require('url');
 let atendimentos = require('./modulos/atendimentos');
 let triagem = require('./modulos/triagem');
 let medico = require('./modulos/medico');
-let profissionais = require('./modulos/profissionais');
 let sessoes = require('./modulos/sessoes');
 
 // A porta pode ser trocada pela variável de ambiente PORTA (usada nos testes).
@@ -25,7 +24,7 @@ let porta = process.env.PORTA || 3000;
 // usando o sistema: { perfil, id, nome } (ou null nas rotas públicas).
 //
 // CONTROLE DE ACESSO (RNF08): permissoes[rota] lista os perfis que podem usar
-// a rota. Rota sem permissões é pública (só as da página inicial).
+// a rota. Rota sem permissões é pública (hoje só POST /api/entrar).
 // O profissional responsável vem sempre da sessão, nunca do formulário:
 // assim ninguém registra uma ação em nome de outra pessoa.
 // ---------------------------------------------------------------------------
@@ -49,18 +48,6 @@ rotas['POST /api/sair'] = function (consulta, dados, sessao, callback, token) {
   callback(null, { saiu: true });
 };
 permissoes['POST /api/sair'] = [RECEPCAO, ENFERMAGEM, MEDICO];
-
-// Profissionais (listas para a escolha do profissional na página inicial).
-// São públicas porque não trazem dados sensíveis: só id, nome e registro.
-rotas['GET /api/recepcionistas'] = function (consulta, dados, sessao, callback) {
-  profissionais.recepcionistas(callback);
-};
-rotas['GET /api/enfermeiros'] = function (consulta, dados, sessao, callback) {
-  profissionais.enfermeiros(callback);
-};
-rotas['GET /api/medicos'] = function (consulta, dados, sessao, callback) {
-  profissionais.medicos(callback);
-};
 
 // Recepção. A consulta de UM atendimento é liberada para os três perfis, mas
 // CPF e RG só vão completos para a recepção (RNF09). A lista dos últimos

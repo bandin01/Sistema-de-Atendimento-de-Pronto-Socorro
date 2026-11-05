@@ -27,7 +27,6 @@ modulos/           back-end — regras de negócio e acesso ao MySQL
   atendimentos.js  recepção: incluir, consultar, alterar, cancelar
   triagem.js       fila e registro da triagem (Manchester)
   medico.js        painel, chamar próximo, prescrições, finalizar com desfecho
-  profissionais.js listas de recepcionistas, enfermeiros e médicos
   historico.js     histórico de status e de etapas
   sessoes.js       entrada no sistema (perfil + login + senha) e sessões em memória
   senhas.js        hash e conferência de senha com scrypt (crypto nativo); `node modulos/senhas.js "senha"` gera um hash

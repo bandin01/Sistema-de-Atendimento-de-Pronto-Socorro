@@ -201,23 +201,3 @@ function dadosDoFormulario(formulario) {
   }
   return dados;
 }
-
-// Carrega a lista de profissionais de um <select> (usada na página inicial). "texto" é uma função que
-// monta o que aparece em cada opção.
-function carregarProfissionais(endereco, idSelect, texto, callback) {
-  chamarApi('GET', endereco, null, function (erro, lista) {
-    let select = elemento(idSelect);
-    if (erro) {
-      select.innerHTML = '<option value="">' + protegerTexto(erro) + '</option>';
-      return;
-    }
-    let opcoes = '<option value="">Selecione...</option>';
-    for (let i = 0; i < lista.length; i++) {
-      opcoes += '<option value="' + lista[i].id + '">' + protegerTexto(texto(lista[i])) + '</option>';
-    }
-    select.innerHTML = opcoes;
-    if (callback) {
-      callback(lista);
-    }
-  });
-}

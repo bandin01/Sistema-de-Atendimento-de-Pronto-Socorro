@@ -30,7 +30,6 @@ teste trabalho/
 │   ├── atendimentos.js    recepção: incluir, consultar, alterar, cancelar
 │   ├── triagem.js         fila e registro da triagem
 │   ├── medico.js          painel, chamar próximo, medicações, finalizar
-│   ├── profissionais.js   listas de recepcionistas, enfermeiros e médicos
 │   ├── historico.js       histórico de status e de etapas do atendimento
 │   ├── sessoes.js         entrada no sistema (login + senha) e sessões por perfil
 │   ├── senhas.js          hash e conferência das senhas (scrypt)
@@ -173,7 +172,6 @@ A coluna *Perfis* mostra quem pode usar cada rota (*pública* = não precisa de 
 | POST | `/api/entrar` | pública | entra no sistema: `{ perfil, login, senha }` → `{ token, perfil, id, nome }` (400 se o login ou a senha estiverem errados) |
 | GET | `/api/sessao` | todos | quem está logado |
 | POST | `/api/sair` | todos | encerra a sessão |
-| GET | `/api/recepcionistas`, `/api/enfermeiros`, `/api/medicos` | pública | listas de profissionais (para a página inicial) |
 | GET | `/api/atendimentos` | Recepção | últimos 50 atendimentos |
 | GET | `/api/atendimentos?numero=AT0001` | todos | consulta um atendimento (CPF/RG mascarados fora da recepção) |
 | POST | `/api/atendimentos` | Recepção | inclui um atendimento (gera o número) |
