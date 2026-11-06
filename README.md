@@ -37,7 +37,7 @@ teste trabalho/
 ├── index.html             página inicial
 ├── HTMLs/                 recepcao, triagem, painel_medico e consulta_medica
 ├── CSSs/                  estilo.css
-├── javascripts/           comum.js + inicio.js (entrada) + um arquivo .js para cada tela
+├── javascripts/           comum.js + inicio.js (entrada) + permissoes.js (esconde menus por perfil) + um .js por tela
 ├── imagens/               logo.svg
 ├── banco/                 scripts SQL (ver "Banco de dados")
 ├── docs/                  MER, DER, dicionário de dados e requisitos
@@ -214,6 +214,9 @@ falso em memória, então **não precisam do MySQL**. Eles conferem o controle d
 as rotas (401 sem sessão, 403 para o perfil errado), a entrada com login e senha (hash scrypt,
 senha certa/errada, login inexistente, profissional inativo, mesma mensagem em todas as falhas,
 `ultimo_login_em`), que o profissional gravado é sempre o da sessão e o mascaramento de CPF/RG.
+
+O `testes/permissoes.test.js` confere que cada perfil só enxerga os menus e cartões da sua área
+(a recepção não vê Triagem nem Painel do Médico) e que quem não entrou não vê nenhum deles.
 
 ## Requisitos
 

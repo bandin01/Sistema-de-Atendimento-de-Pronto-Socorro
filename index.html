@@ -21,9 +21,9 @@
   <nav>
     <ul>
       <li><a href="index.html" class="atual">Início</a></li>
-      <li><a href="HTMLs/recepcao.html">Recepção</a></li>
-      <li><a href="HTMLs/triagem.html">Triagem</a></li>
-      <li><a href="HTMLs/painel_medico.html">Painel do Médico</a></li>
+      <li data-perfis="RECEPCAO"><a href="HTMLs/recepcao.html">Recepção</a></li>
+      <li data-perfis="ENFERMAGEM"><a href="HTMLs/triagem.html">Triagem</a></li>
+      <li data-perfis="MEDICO"><a href="HTMLs/painel_medico.html">Painel do Médico</a></li>
     </ul>
   </nav>
 
@@ -81,20 +81,20 @@
       </ol>
     </section>
 
-    <section>
+    <section data-perfis="RECEPCAO ENFERMAGEM MEDICO">
       <h2>Acesse a sua área</h2>
       <div class="areas">
-        <article>
+        <article data-perfis="RECEPCAO">
           <h3>Recepção</h3>
           <p>Inclusão, consulta, alteração e cancelamento de atendimentos.</p>
           <a href="HTMLs/recepcao.html">Abrir a Recepção</a>
         </article>
-        <article>
+        <article data-perfis="ENFERMAGEM">
           <h3>Triagem</h3>
           <p>Sinais vitais, queixas e classificação de risco.</p>
           <a href="HTMLs/triagem.html">Abrir a Triagem</a>
         </article>
-        <article>
+        <article data-perfis="MEDICO">
           <h3>Médico</h3>
           <p>Painel de atendimentos, medicações e confirmação.</p>
           <a href="HTMLs/painel_medico.html">Abrir o Painel do Médico</a>
@@ -127,6 +127,7 @@
   </footer>
 
   <script src="javascripts/comum.js"></script>
+  <script src="javascripts/permissoes.js"></script>
   <script src="javascripts/inicio.js"></script>
 </body>
 </html>

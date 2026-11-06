@@ -33,7 +33,7 @@ modulos/           back-end — regras de negócio e acesso ao MySQL
   utilitarios.js   funções pequenas reaproveitadas (erro, texto, numeroAtendimento…)
 index.html         página inicial (entrada no sistema)
 HTMLs/             telas: recepcao, triagem, painel_medico, consulta_medica
-javascripts/       comum.js (chamarApi, sessão, exigirPerfil) + inicio.js + um .js por tela
+javascripts/       comum.js (chamarApi, sessão, exigirPerfil) + inicio.js + permissoes.js + um .js por tela
 CSSs/estilo.css    estilos
 imagens/           logo
 banco/             scripts SQL numerados + dados_iniciais.sql + script_completo.sql (tudo junto)
@@ -43,7 +43,7 @@ testes/            testes com node:test e banco falso (npm test, não precisa do
 
 Regra de negócio vive em `modulos/` (back-end), nunca só no front-end. O `servidor.js` só roteia: cada rota recebe `(consulta, dados, sessao, callback)` e chama uma função de um módulo, que devolve `callback(erro, resultado)`, com erros criados por `util.erro(status, mensagem)`.
 
-Toda rota nova precisa de uma linha `permissoes['MÉTODO /caminho'] = [perfis]` em `servidor.js` (sem ela a rota fica pública) e de uma linha na lista `rotasProtegidas` de `testes/acesso.test.js`. O profissional responsável vem sempre de `sessao.id`, nunca do corpo da requisição. No front-end, cada tela chama `exigirPerfil('PERFIL')` antes de carregar dados.
+Toda rota nova precisa de uma linha `permissoes['MÉTODO /caminho'] = [perfis]` em `servidor.js` (sem ela a rota fica pública) e de uma linha na lista `rotasProtegidas` de `testes/acesso.test.js`. O profissional responsável vem sempre de `sessao.id`, nunca do corpo da requisição. No front-end, cada tela chama `exigirPerfil('PERFIL')` antes de carregar dados, e todo menu, link ou botão restrito a um perfil leva `data-perfis="PERFIL ..."` (o `permissoes.js` remove o elemento para os outros perfis).
 
 Ao mudar o banco, crie um novo script numerado em `banco/` **e** atualize `banco/script_completo.sql` e a documentação em `docs/`.
 

@@ -1,25 +1,37 @@
-# changes.md — Remoção das listas públicas de profissionais
+# changes.md — Menus visíveis só para o perfil com permissão (RBAC na interface)
 
 ## Resumo
 
 | Pedido | O que foi feito |
 |---|---|
-| Remover as listas de nomes que ficaram sem uso | Foram removidas as rotas `GET /api/recepcionistas`, `GET /api/enfermeiros` e `GET /api/medicos`. Elas existiam só para montar a lista "escolha o seu nome" da página inicial antiga. Com a entrada por login e senha (PR #1), não tinham mais uso e ainda mostravam os nomes, o COREN e o CRM dos profissionais para qualquer pessoa, **sem precisar entrar**. Agora essas rotas respondem 404. |
+| Menus e links só aparecem para os cargos com permissão (ex.: a recepção não enxerga "Triagem") | Novo script `javascripts/permissoes.js`. Ele lê o perfil salvo no `sessionStorage` no login e **remove da página** todo elemento com `data-perfis` que não inclua esse perfil. Não aparece aviso de "acesso negado": o elemento simplesmente some. |
 
-A única rota pública da API agora é `POST /api/entrar`.
+| Quem entrou | O que aparece no menu |
+|---|---|
+| Ninguém | Só "Início" |
+| Recepção | Início + Recepção |
+| Enfermagem | Início + Triagem |
+| Médico | Início + Painel do Médico |
 
 ## Arquivos
 
-- `modulos/profissionais.js`: **removido**. Ele só servia a essas três rotas.
-- `servidor.js`: saíram o `require` do módulo e as três rotas. O comentário sobre rotas públicas foi atualizado.
-- `javascripts/comum.js`: saiu a função `carregarProfissionais`, que nenhuma tela usava mais.
-- `testes/acesso.test.js`: o teste "rotas públicas funcionam sem sessão" virou "as listas de profissionais não existem mais". Ele confere que as três rotas dão 404, com e sem sessão.
-- `README.md` e `CLAUDE.md`: saíram `profissionais.js` da estrutura e a linha das listas da tabela da API.
-- `docs/DICIONARIO_DADOS.md`: saiu a menção a `GET /api/medicos`.
+- `javascripts/permissoes.js`: **novo**. Função `aplicarPermissoes()`, que roda ao carregar a página.
+- `index.html`, `HTMLs/recepcao.html`, `HTMLs/triagem.html`, `HTMLs/painel_medico.html`, `HTMLs/consulta_medica.html`: os itens Recepção, Triagem e Painel do Médico do menu ganharam `data-perfis`, e o `<script>` do `permissoes.js` entrou depois do `comum.js`.
+- `index.html`: os cartões de "Acesse a sua área" também ganharam `data-perfis`. A seção inteira fica oculta para quem não entrou.
+- `testes/permissoes.test.js`: **novo**. 4 testes que rodam o `permissoes.js` com as páginas reais para cada perfil.
+- `README.md` e `CLAUDE.md`: incluem o `permissoes.js` e a regra de marcar elementos restritos com `data-perfis`.
 
-Nenhuma mudança no banco nem nas telas. As telas da recepção, da triagem e do médico já pegavam o profissional da sessão, e não dessas listas.
+O login (`inicio.js`) não mudou: ele já salvava `{ token, perfil, id, nome }` no `sessionStorage`. O `exigirPerfil()` das telas e a validação de perfil no servidor continuam iguais.
+
+## Como marcar um elemento novo
+
+```html
+<li data-perfis="ENFERMAGEM"><a href="triagem.html">Triagem</a></li>
+<button data-perfis="RECEPCAO MEDICO">Ver histórico</button>   <!-- dois perfis -->
+```
+
+Os perfis vão separados por espaço: `RECEPCAO`, `ENFERMAGEM` ou `MEDICO`. Um elemento sem `data-perfis` aparece para todos.
 
 ## Validação
 
-- `npm test`: 18/18 passando.
-- Busca no projeto: nenhum arquivo do front-end ou do back-end usa mais as rotas ou o módulo removidos.
+- `npm test`: 22/22 passando (os 18 que já existiam + 4 novos).
