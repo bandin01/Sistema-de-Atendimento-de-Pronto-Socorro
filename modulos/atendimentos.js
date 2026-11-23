@@ -1,13 +1,11 @@
-// Módulo da RECEPÇÃO: inclusão, consulta, alteração e cancelamento do atendimento.
+// Recepção: inclusão, consulta, alteração e cancelamento do atendimento.
 let banco = require('./banco');
 let historico = require('./historico');
 let util = require('./utilitarios');
 
-// A recepção só pode alterar ou cancelar o atendimento enquanto ele ainda não
-// foi confirmado pelo médico, ou seja, nestes dois status (RF04, RF05).
+// Status em que a recepção ainda altera/cancela: antes da confirmação médica (RF04, RF05).
 let statusAlteraveis = ['AGUARDANDO_TRIAGEM', 'AGUARDANDO_CONSULTA'];
 
-// Lê os dados do paciente enviados pelo formulário.
 function lerPaciente(dados) {
   return {
     nome: util.texto(dados.nome),
@@ -20,8 +18,7 @@ function lerPaciente(dados) {
   };
 }
 
-// Devolve a mensagem do primeiro problema encontrado, ou "" se estiver tudo certo.
-// CPF, RG e nome dos pais são opcionais: o pronto-socorro atende quem chega sem documento.
+// Devolve o primeiro problema, ou "". CPF, RG e pais são opcionais: o PS atende quem chega sem documento.
 function validarPaciente(paciente) {
   if (paciente.nome.length < 3 || paciente.nome.length > 150) {
     return 'Informe o nome completo do paciente.';
@@ -44,7 +41,6 @@ function validarPaciente(paciente) {
   return '';
 }
 
-// Valores na ordem das colunas: nome, endereco, cpf, rg, nome_pai, nome_mae, data_nascimento.
 function valoresDoPaciente(paciente) {
   return [
     paciente.nome,
@@ -76,9 +72,7 @@ function atualizarPaciente(conexao, pacienteId, paciente, callback) {
   conexao.query(sql, valores, callback);
 }
 
-// Quem volta ao pronto-socorro é reconhecido pelo CPF e reaproveita o cadastro
-// (com os dados atualizados). Sem CPF, é sempre um cadastro novo.
-// Devolve o id do paciente.
+// Quem volta é reconhecido pelo CPF e reaproveita o cadastro; sem CPF, é cadastro novo.
 function gravarPaciente(conexao, paciente, callback) {
   if (paciente.cpf == '') {
     return inserirPaciente(conexao, paciente, callback);
@@ -107,8 +101,7 @@ function gravarPaciente(conexao, paciente, callback) {
   });
 }
 
-// Confere se o atendimento existe e se ainda pode ser alterado/cancelado.
-// Devolve um erro, ou null se estiver liberado.
+// Devolve o erro que impede alterar/cancelar, ou null.
 function verificarAlteravel(numero, linhas) {
   if (linhas.length == 0) {
     return util.erro(404, 'Atendimento ' + numero + ' não encontrado.');
@@ -126,9 +119,7 @@ function verificarAlteravel(numero, linhas) {
   return null;
 }
 
-// INCLUSÃO (RF01, RF02): cadastra o paciente e gera o número do atendimento.
-// O número (AT0001, AT0002...) é gerado pelo próprio banco, no trigger
-// trg_atendimentos_bi_numero, e nunca se repete.
+// INCLUSÃO (RF01, RF02). O número AT0001 é gerado pelo trigger trg_atendimentos_bi_numero.
 exports.abrir = function (dados, callback) {
   let recepcionistaId = parseInt(dados.recepcionista_id, 10);
   if (isNaN(recepcionistaId)) {
@@ -181,9 +172,7 @@ exports.abrir = function (dados, callback) {
   }, callback);
 };
 
-// CONSULTA (RF03): dados do paciente, situação e histórico do atendimento.
-// CPF e RG só vão completos para a recepção, que cadastra e altera o paciente;
-// para os outros perfis eles vão mascarados (RNF09).
+// CONSULTA (RF03). CPF/RG completos só para a recepção; mascarados para os outros (RNF09).
 exports.consultar = function (numero, perfil, callback) {
   numero = util.numeroAtendimento(numero);
   let sql = 'SELECT a.id, a.numero_atendimento, a.status, a.criado_em, a.finalizado_em, ' +
@@ -235,7 +224,6 @@ exports.consultar = function (numero, perfil, callback) {
   });
 };
 
-// Lista os últimos atendimentos abertos, para a recepção acompanhar o movimento.
 exports.listar = function (callback) {
   let sql = 'SELECT a.numero_atendimento, p.nome, a.status, a.criado_em ' +
             'FROM atendimentos a JOIN pacientes p ON p.id = a.paciente_id ' +
@@ -243,7 +231,7 @@ exports.listar = function (callback) {
   banco.executar(sql, [], callback);
 };
 
-// ALTERAÇÃO (RF04): corrige os dados do paciente, só antes da confirmação médica.
+// ALTERAÇÃO (RF04): só antes da confirmação médica.
 exports.alterar = function (dados, callback) {
   let numero = util.numeroAtendimento(dados.numero_atendimento);
   let paciente = lerPaciente(dados);
@@ -253,8 +241,7 @@ exports.alterar = function (dados, callback) {
   }
 
   banco.transacao(function (conexao, concluir) {
-    // FOR UPDATE trava o atendimento até o fim da transação: assim o médico
-    // não consegue chamar este paciente no meio da alteração.
+    // FOR UPDATE: o médico não chama este paciente no meio da alteração.
     let sql = 'SELECT paciente_id, status FROM atendimentos WHERE numero_atendimento = ? FOR UPDATE';
     conexao.query(sql, [numero], function (err, linhas) {
       if (err) {
@@ -271,8 +258,7 @@ exports.alterar = function (dados, callback) {
   }, callback);
 };
 
-// CANCELAMENTO (RF05): só antes da confirmação médica.
-// O banco também impede (trigger trg_atendimentos_bu_bloqueio).
+// CANCELAMENTO (RF05): só antes da confirmação médica (o trigger trg_atendimentos_bu_bloqueio também impede).
 exports.cancelar = function (dados, callback) {
   let numero = util.numeroAtendimento(dados.numero_atendimento);
   let recepcionistaId = parseInt(dados.recepcionista_id, 10);

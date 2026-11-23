@@ -1,9 +1,7 @@
-// Módulo de acesso ao banco de dados MySQL.
-// Usa o módulo mysql2 (instalado com "npm install"), que permite ao Node.js
-// enviar comandos SQL para o MySQL.
+// Acesso ao MySQL (mysql2).
 let mysql = require('mysql2');
 
-// Dados de conexão com o MySQL: altere a senha para a do seu computador.
+// Altere a senha para a do MySQL do seu computador.
 let configuracao = {
   host: 'localhost',
   port: 3306,
@@ -13,18 +11,14 @@ let configuracao = {
   dateStrings: true      // devolve datas como texto: '2026-10-15 14:30:00'
 };
 
-// Um "pool" mantém algumas conexões abertas e reaproveita cada uma delas,
-// permitindo que vários usuários usem o sistema ao mesmo tempo.
 let conexoes = mysql.createPool(configuracao);
 
-// Executa um comando SQL. Os "?" do comando são trocados pelos valores,
-// na ordem, sempre de forma segura (o mysql2 trata aspas e caracteres especiais).
+// Os "?" são trocados pelos valores com escape (evita SQL injection).
 exports.executar = function (sql, valores, callback) {
   conexoes.query(sql, valores, callback);
 };
 
-// Executa uma lista de comandos { sql, valores }, um depois do outro, na mesma
-// conexão. Para no primeiro erro.
+// Executa [{ sql, valores }] em sequência na mesma conexão; para no primeiro erro.
 exports.executarEmOrdem = function (conexao, comandos, callback) {
   let i = 0;
   function proximo(err) {
@@ -43,9 +37,7 @@ exports.executarEmOrdem = function (conexao, comandos, callback) {
   proximo(null);
 };
 
-// Executa vários comandos como uma TRANSAÇÃO: ou todos são gravados, ou nenhum.
-// "passos" é uma função que recebe a conexão e uma função "concluir(erro, resultado)",
-// que deve ser chamada quando todos os comandos terminarem.
+// TRANSAÇÃO: passos(conexao, concluir) chama concluir(erro, resultado) no fim; com erro, ROLLBACK.
 exports.transacao = function (passos, callback) {
   conexoes.getConnection(function (err, conexao) {
     if (err) {
@@ -58,7 +50,6 @@ exports.transacao = function (passos, callback) {
       }
       passos(conexao, function (erro, resultado) {
         if (erro) {
-          // Algo deu errado: desfaz tudo o que foi feito nesta transação.
           conexao.rollback(function () {
             conexao.release();
             callback(erro);

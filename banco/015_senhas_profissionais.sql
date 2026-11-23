@@ -1,14 +1,5 @@
--- =============================================================================
--- 015_senhas_profissionais.sql
--- -----------------------------------------------------------------------------
--- A entrada no sistema passa a exigir login + senha (RNF08). A estrutura não
--- muda: as colunas login, senha_hash e ultimo_login_em já existiam (010).
--- Este script só serve para bancos criados ANTES desta mudança, cujos
--- profissionais de exemplo têm senha_hash = 'login-nao-utilizado': ele grava
--- o hash scrypt da senha de demonstração  senha123  para cada um deles.
--- Em banco novo (script_completo.sql) não altera nada, pois os dados
--- iniciais já vêm com os hashes.
--- =============================================================================
+-- 015_senhas_profissionais.sql: só para bancos criados antes da senha (senha_hash = 'login-nao-utilizado').
+-- Grava o hash scrypt de senha123 nos profissionais de exemplo; em banco novo não altera nada.
 
 USE pronto_socorro;
 

@@ -1,22 +1,13 @@
-// Testes do controle de acesso por perfil (RNF08), da entrada com login e senha
-// e do mascaramento de CPF/RG (RNF09).
-// Para rodar:  npm test   (ou  node --test testes/)
-//
-// Não precisam do MySQL: antes de carregar o servidor, o módulo modulos/banco.js
-// é trocado por um banco "falso", que responde às consultas com dados fixos e
-// anota os valores recebidos. Assim dá para conferir, por exemplo, que o
-// profissional gravado é sempre o da sessão, e não o enviado no formulário.
+// Testes de acesso por perfil (RNF08), entrada com login e senha e mascaramento (RNF09). npm test
+// Sem MySQL: modulos/banco.js é trocado por um banco falso que responde dados fixos e anota os
+// valores recebidos (ex.: para conferir que o profissional gravado é o da sessão).
 let test = require('node:test');
 let assert = require('node:assert');
 let http = require('http');
 let path = require('path');
 let crypto = require('crypto');
 
-// ---------------------------------------------------------------------------
-// Banco falso
-// ---------------------------------------------------------------------------
-// Hash no mesmo formato de modulos/senhas.js (scrypt$sal$hash), feito aqui de
-// forma independente para o teste não depender do próprio módulo que testa.
+// Hash no formato de senhas.js, gerado aqui para o teste não depender do módulo testado.
 function hashDe(senha) {
   let sal = crypto.randomBytes(16).toString('hex');
   return 'scrypt$' + sal + '$' + crypto.scryptSync(senha, sal, 64).toString('hex');
@@ -115,8 +106,7 @@ require.cache[require.resolve(path.join(raiz, 'modulos', 'banco.js'))] = {
   id: 'banco-falso', loaded: true, exports: bancoFalso
 };
 
-// Sobe o servidor de verdade numa porta própria para os testes.
-// http.createServer é "espiado" para guardar o servidor e fechá-lo no fim.
+// Sobe o servidor real na porta 3999; createServer é interceptado para fechá-lo no fim.
 process.env.PORTA = '3999';
 let servidor = null;
 let createServerOriginal = http.createServer;
@@ -130,9 +120,6 @@ require(path.join(raiz, 'servidor.js'));
 console.log = logOriginal;
 http.createServer = createServerOriginal;
 
-// ---------------------------------------------------------------------------
-// Ajudantes
-// ---------------------------------------------------------------------------
 function api(metodo, endereco, dados, token) {
   return new Promise(function (resolve, reject) {
     let cabecalhos = { 'Content-Type': 'application/json' };
@@ -151,7 +138,7 @@ function api(metodo, endereco, dados, token) {
         });
       });
     req.on('error', reject);
-    // Se o servidor não responder (por exemplo, por um erro dentro da rota), o teste falha em vez de travar.
+    // Sem resposta (ex.: erro dentro da rota), o teste falha em vez de travar.
     req.setTimeout(3000, function () {
       req.destroy(new Error('O servidor não respondeu a ' + metodo + ' ' + endereco));
     });
@@ -205,12 +192,9 @@ test.before(async function () {
 
 test.after(function () {
   servidor.closeAllConnections();
-  servidor.close();   // encerra o servidor que ficou escutando a porta
+  servidor.close();
 });
 
-// ---------------------------------------------------------------------------
-// Testes
-// ---------------------------------------------------------------------------
 test('mascaramento de CPF e RG', function () {
   let util = require(path.join(raiz, 'modulos', 'utilitarios.js'));
   assert.strictEqual(util.mascararCpf('52998224725'), '***.***.*47-25');

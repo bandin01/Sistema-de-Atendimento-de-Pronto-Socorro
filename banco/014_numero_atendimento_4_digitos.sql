@@ -1,11 +1,4 @@
--- =============================================================================
--- 014_numero_atendimento_4_digitos.sql
--- -----------------------------------------------------------------------------
--- Ajuste do número de atendimento para o formato do descritivo do projeto,
--- que usa como exemplo "AT0001" (4 dígitos). O trigger original (001) gerava
--- "AT001" (3 dígitos). A única mudança é o 3 → 4 dentro do GREATEST.
--- Continua único e sequencial mesmo com cadastros simultâneos (RNF03).
--- =============================================================================
+-- 014_numero_atendimento_4_digitos.sql: AT001 → AT0001 (formato do descritivo); só muda o 3 → 4 no GREATEST.
 
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_numero;
 

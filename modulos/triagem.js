@@ -1,12 +1,11 @@
-// Módulo da TRIAGEM (enfermagem): sinais vitais, queixas e classificação de Manchester.
+// Triagem (enfermagem): sinais vitais, queixas e classificação de Manchester.
 let banco = require('./banco');
 let historico = require('./historico');
 let util = require('./utilitarios');
 
-// Cores do protocolo de Manchester, da mais urgente para a menos urgente.
 let classificacoes = ['VERMELHO', 'LARANJA', 'AMARELO', 'VERDE', 'AZUL'];
 
-// Pacientes que já passaram pela recepção e esperam a triagem, por ordem de chegada.
+// Fila da triagem, por ordem de chegada.
 exports.fila = function (callback) {
   let sql = 'SELECT a.numero_atendimento, p.nome, p.data_nascimento, ' +
             'TIMESTAMPDIFF(YEAR, p.data_nascimento, CURDATE()) AS idade, a.criado_em ' +
@@ -16,7 +15,6 @@ exports.fila = function (callback) {
   banco.executar(sql, [], callback);
 };
 
-// SITUAÇÃO DO(A) ENFERMEIRO(A): disponível, em pausa ou indisponível.
 // Só quem está DISPONIVEL registra triagem.
 let situacoesEnfermagem = ['DISPONIVEL', 'PAUSA', 'INDISPONIVEL'];
 
@@ -54,7 +52,6 @@ exports.alterarSituacao = function (dados, callback) {
   });
 };
 
-// Lê e valida os dados da triagem. Devolve { triagem, problema }.
 function lerTriagem(dados) {
   let triagem = {
     pressao_sistolica: parseInt(dados.pressao_sistolica, 10),
@@ -84,7 +81,7 @@ function lerTriagem(dados) {
   return { triagem: triagem, problema: problema };
 }
 
-// Registra a triagem (RF06, RF07, RF08) e envia o paciente para a fila do médico.
+// Registra a triagem (RF06–RF08) e envia o paciente para a fila do médico.
 exports.registrar = function (dados, callback) {
   let numero = util.numeroAtendimento(dados.numero_atendimento);
   let enfermeiroId = parseInt(dados.enfermeiro_id, 10);
@@ -116,8 +113,7 @@ exports.registrar = function (dados, callback) {
         return concluir(util.erro(400, 'Mude a sua situação para "Disponível" para registrar a triagem.'));
       }
 
-      // O trigger trg_triagens_bi_enfermeiro confere, no banco, se quem triou
-      // é um(a) enfermeiro(a) ativo(a) da categoria ENFERMEIRO.
+      // A categoria ENFERMEIRO (Cofen 661/2021) é conferida só pelo trigger trg_triagens_bi_enfermeiro.
       let sqlTriagem = 'INSERT INTO triagens (atendimento_id, enfermeiro_id, classificacao_manchester, ' +
                        'queixa_principal, pressao_sistolica, pressao_diastolica, frequencia_cardiaca, temperatura) ' +
                        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)';

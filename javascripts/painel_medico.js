@@ -1,14 +1,11 @@
-// Tela do PAINEL DO MÉDICO: sequência de atendimento pela classificação de
-// Manchester e chamada do próximo paciente.
+// Painel do médico: fila por Manchester e chamada do próximo paciente.
 
-// O(a) médico(a) responsável é quem entrou no sistema.
 if (exigirPerfil('MEDICO')) {
   mostrarSituacao();
   carregarPainel();
   setInterval(carregarPainel, 10000);   // atualiza o painel a cada 10 segundos (RNF01)
 }
 
-// Mostra a situação do médico e, se ele já tiver uma consulta aberta, o link para continuar.
 function mostrarSituacao() {
   mostrarMensagem('msgPainel', '', '');
   elemento('botaoChamar').disabled = false;
@@ -38,7 +35,6 @@ function mostrarSituacao() {
   });
 }
 
-// ALTERAR SITUAÇÃO: em plantão, em pausa, de folga ou de licença.
 elemento('botaoSituacao').onclick = function () {
   let dados = { status_operacional: elemento('situacao').value };
   chamarApi('POST', '/api/painel/situacao', dados, function (erro) {
@@ -51,7 +47,6 @@ elemento('botaoSituacao').onclick = function () {
   });
 };
 
-// CHAMAR PRÓXIMO: o sistema entrega ao médico o paciente de maior prioridade.
 elemento('botaoChamar').onclick = function () {
   chamarApi('POST', '/api/painel/chamar', {}, function (erro) {
     if (erro) {

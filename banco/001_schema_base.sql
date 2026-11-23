@@ -1,18 +1,8 @@
--- =============================================================================
--- 001_schema_base.sql
--- -----------------------------------------------------------------------------
--- Schema base do fluxo de atendimento: pacientes, atendimentos (com o número
--- AT0001), triagens e prescrições. As migrations 010 a 014 completam o
--- modelo (profissionais, vínculos, histórico, consultas e desfechos).
--- Ordem: 000 → 001 → 010 → 011 → 012 → 013 → 014 → dados_iniciais.
---
--- Para recriar o banco inteiro de uma vez: banco/script_completo.sql
--- Requer MySQL 8.0.16+ (CHECK constraints são aplicadas a partir dessa versão).
--- =============================================================================
+-- 001_schema_base.sql: pacientes, atendimentos (número AT0001), triagens e prescrições.
+-- Ordem: 000 → 001 → 010 → 011 → 012 → 013 → 014 → dados_iniciais → 015 (ou tudo em script_completo.sql).
+-- Requer MySQL 8.0.16+ (CHECK constraints).
 
--- RF01: nome completo, endereço, RG, CPF, nome do pai, nome da mãe e nascimento.
--- CPF/RG ficam NULL porque o PS atende quem chega sem documento; nome do pai
--- pode ser desconhecido, e a mãe também (ex.: paciente em situação de rua).
+-- CPF, RG e nome dos pais são opcionais: o PS atende quem chega sem documento (RF01).
 CREATE TABLE IF NOT EXISTS pacientes (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome             VARCHAR(150) NOT NULL,
@@ -28,23 +18,12 @@ CREATE TABLE IF NOT EXISTS pacientes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- -----------------------------------------------------------------------------
--- Número de atendimento AT0001 (RNF03; 4 dígitos a partir da migration 014)
--- -----------------------------------------------------------------------------
--- Por que uma tabela de sequência?
---   * Em um BEFORE INSERT o valor de AUTO_INCREMENT da própria linha ainda não
---     existe (NEW.id = 0), e um AFTER INSERT não pode fazer UPDATE na mesma
---     tabela. Coluna gerada também não pode referenciar AUTO_INCREMENT.
---   * `SELECT MAX(id) + 1` dentro do trigger NÃO é seguro sob concorrência:
---     duas conexões leem o mesmo MAX e geram o mesmo número.
---   * Inserir numa tabela de sequência com AUTO_INCREMENT é atômico no InnoDB e
---     LAST_INSERT_ID() é isolado por conexão → número único mesmo com várias
---     recepções cadastrando ao mesmo tempo.
---
--- Cuidado com LPAD: LPAD('1000', 3, '0') devolve '100' (TRUNCA!). Isso geraria
--- AT100 duplicado a partir do atendimento 1000. Por isso usamos GREATEST(...).
---
--- Observação: se uma transação sofrer ROLLBACK, o número consumido não volta.
--- O número continua único e crescente, mas pode haver "buracos" (AT007 → AT009).
+-- Número de atendimento AT0001 (RNF03; 4 dígitos desde a 014)
+-- Tabela de sequência porque: no BEFORE INSERT o AUTO_INCREMENT ainda não existe, o
+-- AFTER INSERT não pode dar UPDATE na mesma tabela e MAX(id) + 1 duplica sob concorrência.
+-- INSERT na sequência + LAST_INSERT_ID() é atômico e isolado por conexão.
+-- GREATEST no LPAD: LPAD('1000', 3, '0') devolve '100' (trunca e duplicaria o número).
+-- ROLLBACK consome o número: pode haver buracos (AT0007 → AT0009), nunca repetição.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sequencia_atendimento (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,

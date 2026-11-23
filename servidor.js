@@ -1,10 +1,4 @@
-// Servidor do Sistema de Atendimento de Pronto Socorro.
-// Para iniciar, abra o terminal nesta pasta e digite:  node servidor.js
-// Depois, abra no navegador:  http://localhost:3000
-//
-// O mesmo servidor faz duas coisas:
-//   1) entrega as páginas do site (front-end): index.html, HTMLs, CSSs, javascripts e imagens;
-//   2) responde à API (back-end) em JSON, nos endereços que começam com /api/.
+// Entrega o front-end e responde à API em /api/. Iniciar: node servidor.js → http://localhost:3000
 let http = require('http');
 let fs = require('fs');
 let url = require('url');
@@ -14,20 +8,11 @@ let triagem = require('./modulos/triagem');
 let medico = require('./modulos/medico');
 let sessoes = require('./modulos/sessoes');
 
-// A porta pode ser trocada pela variável de ambiente PORTA (usada nos testes).
-let porta = process.env.PORTA || 3000;
+let porta = process.env.PORTA || 3000;   // PORTA é trocada nos testes
 
-// ---------------------------------------------------------------------------
-// API: cada rota é "MÉTODO /caminho" e aponta para uma função.
-// "consulta" são os parâmetros da URL (?numero=AT0001), "dados" é o JSON
-// enviado pelo navegador no corpo da requisição e "sessao" é quem está
-// usando o sistema: { perfil, id, nome } (ou null nas rotas públicas).
-//
-// CONTROLE DE ACESSO (RNF08): permissoes[rota] lista os perfis que podem usar
-// a rota. Rota sem permissões é pública (hoje só POST /api/entrar).
-// O profissional responsável vem sempre da sessão, nunca do formulário:
-// assim ninguém registra uma ação em nome de outra pessoa.
-// ---------------------------------------------------------------------------
+// rotas['MÉTODO /caminho'] = function (consulta, dados, sessao, callback).
+// permissoes[rota] lista os perfis autorizados (RNF08); rota sem permissões é pública.
+// O profissional responsável vem sempre da sessão, nunca do corpo da requisição.
 let rotas = [];
 let permissoes = [];
 
@@ -35,7 +20,6 @@ let RECEPCAO = 'RECEPCAO';
 let ENFERMAGEM = 'ENFERMAGEM';
 let MEDICO = 'MEDICO';
 
-// Sessão: entrar, ver quem está logado e sair
 rotas['POST /api/entrar'] = function (consulta, dados, sessao, callback) {
   sessoes.entrar(dados, callback);
 };
@@ -49,14 +33,13 @@ rotas['POST /api/sair'] = function (consulta, dados, sessao, callback, token) {
 };
 permissoes['POST /api/sair'] = [RECEPCAO, ENFERMAGEM, MEDICO];
 
-// Recepção. A consulta de UM atendimento é liberada para os três perfis, mas
-// CPF e RG só vão completos para a recepção (RNF09). A lista dos últimos
-// atendimentos é só da recepção.
+// Um atendimento: os três perfis (CPF/RG completos só para a recepção, RNF09).
+// Lista dos últimos atendimentos: só a recepção.
 rotas['GET /api/atendimentos'] = function (consulta, dados, sessao, callback) {
   if (consulta.numero) {
-    atendimentos.consultar(consulta.numero, sessao.perfil, callback);   // consulta de um atendimento
+    atendimentos.consultar(consulta.numero, sessao.perfil, callback);
   } else if (sessao.perfil == RECEPCAO) {
-    atendimentos.listar(callback);                                       // últimos atendimentos
+    atendimentos.listar(callback);
   } else {
     callback(acessoNegado([RECEPCAO]));
   }
@@ -77,7 +60,6 @@ rotas['POST /api/atendimentos/cancelar'] = function (consulta, dados, sessao, ca
 };
 permissoes['POST /api/atendimentos/cancelar'] = [RECEPCAO];
 
-// Triagem: só a enfermagem
 rotas['GET /api/triagem/fila'] = function (consulta, dados, sessao, callback) {
   triagem.fila(callback);
 };
@@ -97,7 +79,6 @@ rotas['POST /api/triagem/situacao'] = function (consulta, dados, sessao, callbac
 };
 permissoes['POST /api/triagem/situacao'] = [ENFERMAGEM];
 
-// Médico: só o médico
 rotas['GET /api/painel'] = function (consulta, dados, sessao, callback) {
   medico.painel(callback);
 };
@@ -127,7 +108,6 @@ rotas['POST /api/consulta/finalizar'] = function (consulta, dados, sessao, callb
 };
 permissoes['POST /api/consulta/finalizar'] = [MEDICO];
 
-// Erro 403 com os perfis que poderiam usar a função.
 function acessoNegado(perfis) {
   let nomes = [];
   for (let i = 0; i < perfis.length; i++) {
@@ -136,7 +116,6 @@ function acessoNegado(perfis) {
   return { status: 403, mensagem: 'Acesso negado: esta função é exclusiva do perfil ' + nomes.join(' / ') + '.' };
 }
 
-// Lê o corpo da requisição (o JSON enviado pelo navegador) e o converte em objeto.
 function lerCorpo(req, callback) {
   let corpo = '';
   req.on('data', function (pedaco) {
@@ -159,10 +138,9 @@ function lerCorpo(req, callback) {
   });
 }
 
-// Traduz um erro em código HTTP + mensagem para o usuário.
 function descreverErro(err) {
   if (err.status) {
-    return { status: err.status, mensagem: err.mensagem };           // erro das regras do sistema
+    return { status: err.status, mensagem: err.mensagem };
   }
   if (err.sqlState == '45000') {
     return { status: 400, mensagem: err.sqlMessage };                // regra garantida por trigger do banco
@@ -187,7 +165,6 @@ function descreverErro(err) {
   return { status: 500, mensagem: 'Erro interno no servidor.' };
 }
 
-// Envia a resposta da API em JSON.
 function responder(res, err, dados) {
   let status = 200;
   let resposta = dados;
@@ -205,7 +182,6 @@ function tratarApi(req, res, endereco) {
   if (rota === undefined) {
     return responder(res, { status: 404, mensagem: 'Endereço da API não encontrado.' });
   }
-  // Confere quem está chamando e se o perfil dele pode usar esta rota.
   let token = req.headers['x-sessao'];
   let sessao = null;
   let perfis = permissoes[req.method + ' ' + endereco.pathname];
@@ -228,9 +204,6 @@ function tratarApi(req, res, endereco) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// SITE: entrega os arquivos do front-end (como no exercício do slide de Node).
-// ---------------------------------------------------------------------------
 let tipos = [];
 tipos['.html'] = 'text/html; charset=utf-8';
 tipos['.css'] = 'text/css; charset=utf-8';
@@ -240,8 +213,7 @@ tipos['.jpg'] = 'image/jpeg';
 tipos['.svg'] = 'image/svg+xml';
 tipos['.ico'] = 'image/x-icon';
 
-// Só os arquivos do site podem ser baixados (nunca os módulos do servidor,
-// que contêm a senha do banco).
+// Só estas pastas são servidas: nunca modulos/, que contém a senha do banco.
 let pastasDoSite = ['/HTMLs/', '/CSSs/', '/javascripts/', '/imagens/'];
 
 function arquivoPermitido(caminho, extensao) {
@@ -261,7 +233,7 @@ function arquivoPermitido(caminho, extensao) {
 
 function entregarArquivo(res, caminho) {
   if (caminho == '/') {
-    caminho = '/index.html';    // página inicial do site
+    caminho = '/index.html';
   }
   let extensao = caminho.slice(caminho.lastIndexOf('.'));
   if (!arquivoPermitido(caminho, extensao)) {

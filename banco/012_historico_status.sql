@@ -1,13 +1,5 @@
--- =============================================================================
--- 012_historico_status.sql
--- =============================================================================
--- Histórico de mudanças de status do atendimento (RF14). Os valores de status
--- são os mesmos de atendimentos.status (001). A tabela é criada depois de 010
--- e 011 porque depende de recepcionistas, medicos, enfermeiros e atendimentos.
---
--- Quem alterou o status (RF14): como cada perfil tem a sua própria tabela, há
--- uma FK por tabela de profissional. O CHECK exige exatamente uma preenchida.
--- =============================================================================
+-- 012_historico_status.sql: histórico de status do atendimento (RF14).
+-- Uma FK por tabela de profissional; o CHECK exige exatamente uma preenchida.
 
 CREATE TABLE IF NOT EXISTS historico_status (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,

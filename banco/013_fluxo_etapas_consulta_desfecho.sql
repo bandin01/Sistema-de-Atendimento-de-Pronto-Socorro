@@ -1,63 +1,27 @@
--- =============================================================================
--- 013_fluxo_etapas_consulta_desfecho.sql
--- -----------------------------------------------------------------------------
--- Refatoração do MER/DER: o atendimento passa a ser modelado como um PROCESSO
--- em etapas, não como ator do sistema.
---
+-- 013_fluxo_etapas_consulta_desfecho.sql: o atendimento passa a ser um processo em etapas.
 --   Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho
---
--- Cada etapa clínica tem a sua entidade e o seu profissional responsável:
---   atendimentos  (Atendimento Inicial)  ← recepcionista (historico_status)
---   triagens      (Triagem)              ← enfermeiro
---   consultas     (Consulta)             ← médico            [NOVA]
---   desfechos     (Desfecho)             ← médico, via consulta [NOVA]
---
--- O que muda:
---   1. Atendimento perde os dados do médico (medico_id, confirmado_medico_em e
---      a coluna gerada medico_em_atendimento_id). O vínculo com o médico passa
---      para a nova tabela consultas, que também garante RF20 (um médico, no
---      máximo uma consulta aberta) com índice único em coluna gerada.
---   2. Status do atendimento descrevem a etapa, não o médico:
---        AGUARDANDO_MEDICO      → AGUARDANDO_CONSULTA
---        EM_ATENDIMENTO_MEDICO  → EM_CONSULTA
---   3. Médico ganha status operacional próprio (medicos.status_operacional):
---        EM_PLANTAO | EM_CONSULTA (só o sistema) | PAUSA | FOLGA | LICENCA
---        DISPONIVEL → EM_PLANTAO, EM_ATENDIMENTO → EM_CONSULTA,
---        INDISPONIVEL → FOLGA
---      com histórico automático em historico_status_medico.
---   4. Desfecho da consulta (desfechos): PRESCRICAO, EXAMES, ENCAMINHAMENTO
---      ou ALTA, com descrição obrigatória. Sem desfecho não há finalização.
---   5. Histórico de etapas do paciente (historico_etapas): uma linha por etapa,
---      com a descrição textual (VARCHAR) do que aconteceu.
---   6. RG fica VARCHAR(9) em todas as tabelas (profissionais saem de VARCHAR(20)),
---      com CHECK de formato (mesma regra do validador da API: 5 a 9 dígitos ou X).
---   7. NOT NULL / CHECK de coerência: atendimento FINALIZADO ⇔ finalizado_em.
---
--- ⚠️ BANCO COM DADOS:
---   * RG com mais de 9 caracteres faz o MODIFY falhar. Confira antes:
+--   * consultas (nova): recebe o vínculo com o médico que estava em atendimentos.
+--   * Status do atendimento nomeiam a etapa: AGUARDANDO_MEDICO → AGUARDANDO_CONSULTA,
+--     EM_ATENDIMENTO_MEDICO → EM_CONSULTA.
+--   * medicos.status_operacional: EM_PLANTAO | EM_CONSULTA (só o sistema) | PAUSA | FOLGA | LICENCA,
+--     com histórico em historico_status_medico.
+--   * desfechos (nova): PRESCRICAO, EXAMES, ENCAMINHAMENTO ou ALTA; sem desfecho não há finalização.
+--   * historico_etapas (nova): uma linha por etapa percorrida.
+--   * RG VARCHAR(9) com CHECK de formato em todas as tabelas; FINALIZADO ⇔ finalizado_em.
+-- ⚠️ BANCO COM DADOS: RG com mais de 9 caracteres faz o MODIFY falhar. Confira antes:
 --       SELECT 'pacientes' t, id, rg FROM pacientes WHERE CHAR_LENGTH(rg) > 9
 --       UNION ALL SELECT 'recepcionistas', id, rg FROM recepcionistas WHERE CHAR_LENGTH(rg) > 9
 --       UNION ALL SELECT 'medicos', id, rg FROM medicos WHERE CHAR_LENGTH(rg) > 9
 --       UNION ALL SELECT 'enfermeiros', id, rg FROM enfermeiros WHERE CHAR_LENGTH(rg) > 9;
---   * Atendimentos e históricos existentes são convertidos (status renomeados,
---     consultas, desfechos e etapas preenchidos a partir dos dados atuais).
---
--- Ordem das seções importa: os triggers novos são criados só no FINAL, depois
--- da conversão dos dados (eles bloqueariam o backfill de registros finalizados).
--- Requer MySQL 8.0.16+. Execute pelo MySQL CLI ou Workbench (ou use script_completo.sql).
--- =============================================================================
+-- Os triggers novos ficam no FINAL: antes, bloqueariam a conversão dos registros finalizados.
+-- Requer MySQL 8.0.16+ e DELIMITER (ou use script_completo.sql).
 
--- -----------------------------------------------------------------------------
--- 1. Triggers da 011 que dependem das colunas/valores que vão mudar.
---    trg_triagens_* e trg_prescricoes_bu_bloqueio continuam válidos.
--- -----------------------------------------------------------------------------
+-- 1. Remove os triggers da 011 que dependem de colunas/valores que vão mudar.
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_medico;
 DROP TRIGGER IF EXISTS trg_atendimentos_bu_medico;
 DROP TRIGGER IF EXISTS trg_prescricoes_bi_medico;
 
--- -----------------------------------------------------------------------------
 -- 2. RG: VARCHAR(20) → VARCHAR(9) + CHECK de formato
--- -----------------------------------------------------------------------------
 ALTER TABLE pacientes
   MODIFY COLUMN rg VARCHAR(9) NULL,
   ADD CONSTRAINT chk_pacientes_rg CHECK (rg IS NULL OR rg REGEXP '^[0-9X]{5,9}$');
@@ -74,12 +38,8 @@ ALTER TABLE enfermeiros
   MODIFY COLUMN rg VARCHAR(9) NULL,
   ADD CONSTRAINT chk_enfermeiros_rg CHECK (rg IS NULL OR rg REGEXP '^[0-9X]{5,9}$');
 
--- -----------------------------------------------------------------------------
--- 3. CONSULTAS (etapa Consulta) — recebe o vínculo com o médico
--- medico_em_consulta_id: só tem valor enquanto a consulta está aberta. O índice
--- UNIQUE garante, no banco e sob concorrência, que um médico conduz no máximo
--- uma consulta por vez (RF20). NULL não conflita em índice UNIQUE.
--- -----------------------------------------------------------------------------
+-- 3. CONSULTAS. medico_em_consulta_id só tem valor com a consulta aberta: o UNIQUE garante
+--    uma consulta por médico (RF20), pois NULL não conflita em UNIQUE.
 CREATE TABLE consultas (
   id                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
   atendimento_id         INT UNSIGNED NOT NULL,
@@ -110,9 +70,7 @@ SELECT a.id,
   FROM atendimentos a
  WHERE a.medico_id IS NOT NULL;
 
--- -----------------------------------------------------------------------------
--- 4. ATENDIMENTOS: sai a indicação do médico; status passam a nomear a etapa
--- -----------------------------------------------------------------------------
+-- 4. ATENDIMENTOS: sai o médico; os status passam a nomear a etapa
 ALTER TABLE atendimentos
   DROP INDEX uk_atendimentos_medico_em_atendimento,
   DROP COLUMN medico_em_atendimento_id;
@@ -152,9 +110,7 @@ ALTER TABLE atendimentos
                        NOT NULL DEFAULT 'AGUARDANDO_TRIAGEM',
   ADD CONSTRAINT chk_atendimentos_finalizacao CHECK ((status = 'FINALIZADO') = (finalizado_em IS NOT NULL));
 
--- -----------------------------------------------------------------------------
 -- 5. HISTÓRICO DE STATUS DO ATENDIMENTO: mesmos valores novos
--- -----------------------------------------------------------------------------
 ALTER TABLE historico_status
   MODIFY COLUMN status_anterior ENUM('AGUARDANDO_TRIAGEM','AGUARDANDO_MEDICO','EM_ATENDIMENTO_MEDICO',
                                      'AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO') NULL,
@@ -179,12 +135,7 @@ ALTER TABLE historico_status
   MODIFY COLUMN status_anterior ENUM('AGUARDANDO_TRIAGEM','AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO') NULL,
   MODIFY COLUMN status_novo     ENUM('AGUARDANDO_TRIAGEM','AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO') NOT NULL;
 
--- -----------------------------------------------------------------------------
--- 6. DESFECHOS (etapa Desfecho/Finalização) — um por consulta
--- O médico responsável é o da consulta (sem coluna duplicada).
--- tipo: PRESCRICAO (alta com receita; itens em prescricoes), EXAMES (alta com
--- pedido de exames), ENCAMINHAMENTO (exige destino) ou ALTA (alta simples).
--- -----------------------------------------------------------------------------
+-- 6. DESFECHOS: um por consulta; o médico responsável é o da consulta.
 CREATE TABLE desfechos (
   id                      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   consulta_id             INT UNSIGNED NOT NULL,
@@ -212,11 +163,7 @@ SELECT c.id,
   FROM consultas c
  WHERE c.finalizada_em IS NOT NULL;
 
--- -----------------------------------------------------------------------------
--- 7. HISTÓRICO DE ETAPAS DO PACIENTE
--- Uma linha por etapa percorrida, com a descrição textual do que aconteceu.
--- Cada etapa acontece no máximo uma vez por atendimento.
--- -----------------------------------------------------------------------------
+-- 7. HISTÓRICO DE ETAPAS: cada etapa no máximo uma vez por atendimento.
 CREATE TABLE historico_etapas (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   atendimento_id  INT UNSIGNED NOT NULL,
@@ -263,10 +210,8 @@ SELECT c.atendimento_id, 'DESFECHO',
   FROM desfechos d
   JOIN consultas c ON c.id = d.consulta_id;
 
--- -----------------------------------------------------------------------------
--- 8. MÉDICOS: status operacional próprio
--- O CHECK e o índice antigos citam status_disponibilidade: saem antes do rename.
--- -----------------------------------------------------------------------------
+-- 8. MÉDICOS: status operacional próprio. O CHECK e o índice antigos citam
+--    status_disponibilidade: saem antes do rename.
 ALTER TABLE medicos
   DROP CHECK chk_medicos_inativo_indisponivel,
   DROP INDEX idx_medicos_disponibilidade;
@@ -293,9 +238,7 @@ ALTER TABLE medicos
   -- Profissional desativado não pode ficar na escala do plantão.
   ADD CONSTRAINT chk_medicos_inativo_fora_do_plantao CHECK (ativo = 1 OR status_operacional IN ('FOLGA', 'LICENCA'));
 
--- -----------------------------------------------------------------------------
--- 9. HISTÓRICO DE STATUS DO MÉDICO (alimentado por trigger, seção 10)
--- -----------------------------------------------------------------------------
+-- 9. HISTÓRICO DE STATUS DO MÉDICO (alimentado pelo trigger da seção 10)
 CREATE TABLE historico_status_medico (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
   medico_id        INT UNSIGNED NOT NULL,
@@ -314,9 +257,7 @@ INSERT INTO historico_status_medico (medico_id, status_anterior, status_novo, da
 SELECT m.id, NULL, m.status_operacional, m.atualizado_em
   FROM medicos m;
 
--- -----------------------------------------------------------------------------
 -- 10. TRIGGERS (defesa em profundidade: o service valida primeiro, o banco garante)
--- -----------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_status;
 DROP TRIGGER IF EXISTS trg_atendimentos_bu_bloqueio;
 DROP TRIGGER IF EXISTS trg_consultas_bi_medico;

@@ -1,28 +1,10 @@
--- =============================================================================
--- 010_recepcionistas_medicos_enfermeiros.sql
--- -----------------------------------------------------------------------------
--- Cria as entidades de profissionais: recepcionistas, medicos e enfermeiros.
--- Requisitos: RF16, RF17, RF18, RNF08
---
--- Decisões:
---   * Cada perfil tem a sua própria tabela, com as suas próprias credenciais
---     (login + senha_hash). Não existe tabela "usuarios" compartilhada: o perfil
---     de acesso é definido pela tabela em que o profissional está
---     (recepcionistas → RECEPCAO, enfermeiros → ENFERMAGEM, medicos → MEDICO).
---   * O login é único dentro de cada tabela (UNIQUE) e também entre as três
---     (procedure sp_validar_login_unico, chamada pelos triggers). Assim a
---     autenticação encontra no máximo um profissional por login.
---   * FKs que apontam para estas tabelas usam ON UPDATE/DELETE RESTRICT:
---     profissionais nunca são apagados (histórico clínico), apenas desativados
---     (ativo = 0).
---   * CPF é armazenado só com dígitos; a máscara é aplicada na API (RNF09).
---
--- Requer MySQL 8.0.16+. Execute pelo MySQL CLI ou Workbench (usa DELIMITER).
--- =============================================================================
+-- 010_recepcionistas_medicos_enfermeiros.sql (RF16, RF17, RF18, RNF08)
+--   * Uma tabela por perfil, cada uma com login + senha_hash: a tabela define o perfil.
+--   * Login único dentro de cada tabela (UNIQUE) e entre as três (sp_validar_login_unico).
+--   * FKs RESTRICT: profissionais nunca são apagados (histórico clínico), só desativados (ativo = 0).
+--   * CPF só com dígitos; a máscara é aplicada na API (RNF09).
+-- Requer MySQL 8.0.16+ e DELIMITER (MySQL CLI ou Workbench).
 
--- -----------------------------------------------------------------------------
--- RECEPCIONISTAS
--- -----------------------------------------------------------------------------
 CREATE TABLE recepcionistas (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome              VARCHAR(150) NOT NULL,
@@ -47,9 +29,6 @@ CREATE TABLE recepcionistas (
   CONSTRAINT chk_recepcionistas_ativo    CHECK (ativo IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------------------------------
--- MÉDICOS
--- -----------------------------------------------------------------------------
 CREATE TABLE medicos (
   id                      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome                    VARCHAR(150) NOT NULL,
@@ -87,13 +66,8 @@ CREATE TABLE medicos (
   CONSTRAINT chk_medicos_inativo_indisponivel CHECK (ativo = 1 OR status_disponibilidade = 'INDISPONIVEL')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------------------------------
--- ENFERMEIROS
--- categoria: pela Resolução Cofen nº 661/2021, a classificação de risco é
--- privativa do ENFERMEIRO dentro da equipe de enfermagem. Técnicos têm login
--- de enfermagem, mas não registram triagem (regra aplicada no service e no
--- trigger da migration 011).
--- -----------------------------------------------------------------------------
+-- categoria: pela Resolução Cofen 661/2021 só o ENFERMEIRO faz a classificação de risco;
+-- técnicos entram como enfermagem, mas não registram triagem (trigger da migration 011).
 CREATE TABLE enfermeiros (
   id                      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome                    VARCHAR(150) NOT NULL,
@@ -130,15 +104,9 @@ CREATE TABLE enfermeiros (
   CONSTRAINT chk_enfermeiros_inativo_indisponivel CHECK (ativo = 1 OR status_disponibilidade = 'INDISPONIVEL')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------------------------------
--- LOGIN ÚNICO ENTRE AS TRÊS TABELAS (RNF08)
--- Cada tabela já garante o próprio UNIQUE; a procedure impede que o mesmo login
--- exista em duas tabelas diferentes. p_tabela = tabela de origem (ignorada na
--- busca, porque ali o UNIQUE já cobre).
--- Limite conhecido: dois INSERTs simultâneos do mesmo login em tabelas
--- diferentes podem passar juntos. Cadastro de profissional é raro e feito por
--- administrador, então o risco é aceitável; o service também valida.
--- -----------------------------------------------------------------------------
+-- Login único entre as três tabelas (RNF08); p_tabela é ignorada porque ali o UNIQUE já cobre.
+-- Limite conhecido: dois INSERTs simultâneos do mesmo login em tabelas diferentes podem passar
+-- (aceitável: cadastro de profissional é raro e feito pelo administrador).
 DROP TRIGGER IF EXISTS trg_recepcionistas_bi_login;
 DROP TRIGGER IF EXISTS trg_recepcionistas_bu_login;
 DROP TRIGGER IF EXISTS trg_medicos_bi_login;
