@@ -1,9 +1,5 @@
-// Testes do javascripts/permissoes.js: cada perfil só vê os menus permitidos.
-// Para rodar:  npm test
-//
-// O script roda num "navegador falso" (módulo vm): os elementos com
-// data-perfis são lidos das páginas HTML de verdade e o sessionStorage é
-// simulado. No fim, confere quais elementos foram removidos.
+// Testes do permissoes.js num navegador falso (vm): os data-perfis vêm das páginas reais
+// e o sessionStorage é simulado.
 let test = require('node:test');
 let assert = require('node:assert');
 let fs = require('fs');

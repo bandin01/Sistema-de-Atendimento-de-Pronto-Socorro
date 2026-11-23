@@ -1,17 +1,15 @@
-// Tela da TRIAGEM: a enfermagem registra os sinais vitais, as queixas e a
-// classificação de Manchester do paciente.
+// Triagem: sinais vitais, queixas e classificação de Manchester.
 
 let filaAtual = [];          // pacientes que estão na tabela da fila
 let numeroEmTriagem = '';    // atendimento aberto no formulário
 
-// O(a) enfermeiro(a) responsável é quem entrou no sistema.
 if (exigirPerfil('ENFERMAGEM')) {
   mostrarSituacao();
   carregarFila();
   setInterval(carregarFila, 15000);   // atualiza a fila a cada 15 segundos
 }
 
-// Mostra a situação do(a) enfermeiro(a): só quem está disponível registra triagem.
+// Só quem está disponível registra triagem.
 function mostrarSituacao() {
   chamarApi('GET', '/api/triagem/situacao', null, function (erro, resposta) {
     if (erro) {
@@ -28,7 +26,6 @@ function mostrarSituacao() {
   });
 }
 
-// ALTERAR SITUAÇÃO: disponível, em pausa ou indisponível.
 elemento('botaoSituacao').onclick = function () {
   let dados = { status_disponibilidade: elemento('situacao').value };
   chamarApi('POST', '/api/triagem/situacao', dados, function (erro) {

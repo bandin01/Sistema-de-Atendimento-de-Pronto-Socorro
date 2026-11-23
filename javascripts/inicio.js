@@ -1,11 +1,8 @@
-// Página INICIAL: o profissional escolhe o seu perfil e digita o seu login e a
-// sua senha. O servidor confere os dados e devolve o token da sessão.
-// A conferência de verdade (login existe, está ativo, senha certa) é sempre
-// feita no servidor; aqui só se avisa antes de enviar se faltou algum campo.
+// Página inicial: entrada por perfil + login + senha. Aqui só se avisa se faltou campo;
+// a conferência de verdade é no servidor.
 
 mostrarSituacao();
 
-// Quem já entrou vê o próprio nome e o link para a sua área; os outros veem o formulário.
 function mostrarSituacao() {
   let sessao = lerSessao();
   elemento('formEntrar').hidden = (sessao != null);
@@ -17,8 +14,6 @@ function mostrarSituacao() {
   }
 }
 
-// Confere se os campos foram preenchidos. Devolve o texto do erro, ou '' se
-// estiver tudo certo, e coloca o cursor no campo que falta.
 function campoQueFalta(dados) {
   if (dados.perfil == '') {
     elemento('perfil').focus();
@@ -36,7 +31,7 @@ function campoQueFalta(dados) {
 }
 
 elemento('formEntrar').onsubmit = function (evento) {
-  evento.preventDefault();   // impede o envio normal, que recarregaria a página
+  evento.preventDefault();
   let dados = dadosDoFormulario(elemento('formEntrar'));
   let falta = campoQueFalta(dados);
   if (falta != '') {
@@ -45,13 +40,13 @@ elemento('formEntrar').onsubmit = function (evento) {
   }
   mostrarMensagem('msgEntrar', '', '');
   let botao = elemento('botaoEntrar');
-  botao.disabled = true;               // evita clicar duas vezes enquanto espera
+  botao.disabled = true;               // evita clique duplo
   botao.textContent = 'Entrando...';
   chamarApi('POST', '/api/entrar', dados, function (erro, sessao) {
     if (erro) {
       botao.disabled = false;
       botao.textContent = 'Entrar';
-      elemento('senha').value = '';    // senha errada: apaga para digitar de novo
+      elemento('senha').value = '';
       elemento('senha').focus();
       mostrarMensagem('msgEntrar', erro, 'erro');
       return;

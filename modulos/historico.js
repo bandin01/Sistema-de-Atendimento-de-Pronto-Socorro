@@ -1,10 +1,7 @@
-// Histórico do atendimento (RF14): toda mudança de status é gravada com o
-// profissional responsável, e cada etapa percorrida pelo paciente é gravada
-// com uma descrição do que aconteceu.
-
+// Histórico do atendimento (RF14): mudanças de status com o responsável e etapas percorridas.
 // registro = {
 //   atendimentoId, statusAnterior, statusNovo,
-//   responsavel: 'recepcionista_id' | 'enfermeiro_id' | 'medico_id',
+//   responsavel: 'recepcionista_id' | 'enfermeiro_id' | 'medico_id'   (vai direto no SQL: só estes valores),
 //   responsavelId,
 //   etapas: [ { etapa: 'TRIAGEM', descricao: '...' }, ... ]   (pode ser vazio)
 // }
@@ -21,7 +18,6 @@ exports.registrar = function (conexao, registro, callback) {
       return callback(null);
     }
 
-    // Monta um único INSERT com uma linha "(?, ?, ?)" para cada etapa.
     let sqlEtapas = 'INSERT INTO historico_etapas (atendimento_id, etapa, descricao) VALUES ';
     let valoresEtapas = [];
     for (let i = 0; i < registro.etapas.length; i++) {

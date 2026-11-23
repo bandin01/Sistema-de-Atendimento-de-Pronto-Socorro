@@ -1,9 +1,6 @@
-// Tela da RECEPÇÃO: inclusão, consulta, alteração e cancelamento do atendimento.
+// Recepção: inclusão, consulta, alteração e cancelamento. A recepcionista vem da sessão.
 
-// A recepcionista responsável é quem entrou no sistema: o servidor a
-// identifica pela sessão.
-
-let atendimentoAtual = null;   // atendimento que está aparecendo na consulta
+let atendimentoAtual = null;   // atendimento exibido na consulta
 
 if (exigirPerfil('RECEPCAO')) {
   carregarRecentes();
@@ -17,9 +14,6 @@ function formatarCpf(cpf) {
   return cpf.slice(0, 3) + '.' + cpf.slice(3, 6) + '.' + cpf.slice(6, 9) + '-' + cpf.slice(9);
 }
 
-// ---------------------------------------------------------------------------
-// INCLUSÃO: cadastra o paciente e gera o número do atendimento
-// ---------------------------------------------------------------------------
 elemento('formNovo').onsubmit = function (evento) {
   evento.preventDefault();
   let dados = dadosDoFormulario(elemento('formNovo'));
@@ -36,9 +30,6 @@ elemento('formNovo').onsubmit = function (evento) {
   });
 };
 
-// ---------------------------------------------------------------------------
-// CONSULTA
-// ---------------------------------------------------------------------------
 elemento('formBusca').onsubmit = function (evento) {
   evento.preventDefault();
   consultar(elemento('numeroBusca').value);
@@ -116,9 +107,6 @@ function mostrarAtendimento(a) {
   elemento('detalhe').hidden = false;
 }
 
-// ---------------------------------------------------------------------------
-// ALTERAÇÃO
-// ---------------------------------------------------------------------------
 elemento('botaoAlterar').onclick = function () {
   let formulario = elemento('formAlterar');
   formulario.elements['nome'].value = atendimentoAtual.nome;
@@ -152,9 +140,6 @@ elemento('formAlterar').onsubmit = function (evento) {
   });
 };
 
-// ---------------------------------------------------------------------------
-// CANCELAMENTO
-// ---------------------------------------------------------------------------
 elemento('botaoCancelar').onclick = function () {
   let confirmou = confirm('Deseja realmente cancelar o atendimento ' + atendimentoAtual.numero_atendimento +
                           ' de ' + atendimentoAtual.nome + '?');
@@ -175,9 +160,6 @@ elemento('botaoCancelar').onclick = function () {
   });
 };
 
-// ---------------------------------------------------------------------------
-// ATENDIMENTOS RECENTES
-// ---------------------------------------------------------------------------
 function carregarRecentes() {
   chamarApi('GET', '/api/atendimentos', null, function (erro, lista) {
     if (erro) {

@@ -1,6 +1,4 @@
-// Funções usadas por todas as telas do sistema.
-
-// Nomes amigáveis para os códigos gravados no banco (arrays associativos).
+// Nomes amigáveis dos códigos gravados no banco.
 let nomesStatus = [];
 nomesStatus['AGUARDANDO_TRIAGEM'] = 'Aguardando triagem';
 nomesStatus['AGUARDANDO_CONSULTA'] = 'Aguardando consulta';
@@ -29,23 +27,17 @@ nomesDesfecho['EXAMES'] = 'Pedido de exames';
 nomesDesfecho['ENCAMINHAMENTO'] = 'Encaminhamento';
 nomesDesfecho['ALTA'] = 'Alta';
 
-// Atalho para document.getElementById.
 function elemento(id) {
   return document.getElementById(id);
 }
 
-// ---------------------------------------------------------------------------
-// SESSÃO (controle de acesso por perfil): quem entrou pela página inicial fica
-// guardado no sessionStorage desta aba: { token, perfil, id, nome }.
-// Cada aba tem a sua sessão, então dá para abrir a recepção numa aba e o
-// médico em outra.
-// ---------------------------------------------------------------------------
+// Sessão { token, perfil, id, nome } no sessionStorage: cada aba tem a sua
+// (dá para abrir a recepção numa aba e o médico em outra).
 let nomesPerfil = [];
 nomesPerfil['RECEPCAO'] = 'Recepção';
 nomesPerfil['ENFERMAGEM'] = 'Enfermagem';
 nomesPerfil['MEDICO'] = 'Médico';
 
-// Página de cada perfil.
 let paginasPerfil = [];
 paginasPerfil['RECEPCAO'] = '/HTMLs/recepcao.html';
 paginasPerfil['ENFERMAGEM'] = '/HTMLs/triagem.html';
@@ -58,7 +50,7 @@ function lerSessao() {
       return JSON.parse(texto);
     }
   } catch (e) {
-    // sessionStorage bloqueado pelo navegador: segue sem sessão
+    // sessionStorage bloqueado: segue sem sessão
   }
   return null;
 }
@@ -79,7 +71,6 @@ function apagarSessao() {
   }
 }
 
-// Encerra a sessão no servidor e volta para a página inicial.
 function sair() {
   chamarApi('POST', '/api/sair', null, function () {
     apagarSessao();
@@ -87,9 +78,7 @@ function sair() {
   });
 }
 
-// Confere se quem está nesta aba tem o perfil da página. Se tiver, mostra o
-// nome dele no elemento "usuarioLogado" e devolve a sessão. Se não tiver,
-// esconde o conteúdo da página, mostra um aviso e devolve null.
+// Devolve a sessão se o perfil for o da página; senão esconde o conteúdo, avisa e devolve null.
 function exigirPerfil(perfil) {
   let sessao = lerSessao();
   if (sessao != null && sessao.perfil == perfil) {
@@ -113,11 +102,8 @@ function exigirPerfil(perfil) {
   return null;
 }
 
-// Envia uma requisição para a API do servidor, com o token da sessão no
-// cabeçalho X-Sessao. A resposta chega como texto JSON e é convertida em
-// objeto com JSON.parse. Depois chama callback(erro, resposta): "erro" é a
-// mensagem de erro, ou null se deu certo.
-// Se a sessão tiver expirado (erro 401), volta para a página inicial.
+// Chama a API com o token no cabeçalho X-Sessao. callback(mensagemDeErro ou null, resposta).
+// Sessão expirada (401) volta para a página inicial.
 function chamarApi(metodo, endereco, dados, callback) {
   let requisicao = new XMLHttpRequest();
   requisicao.open(metodo, endereco);
@@ -148,7 +134,7 @@ function chamarApi(metodo, endereco, dados, callback) {
   }
 }
 
-// Mostra uma mensagem na tela. tipo: 'sucesso' ou 'erro'. Texto vazio esconde.
+// tipo: 'sucesso' ou 'erro'. Texto vazio esconde.
 function mostrarMensagem(id, texto, tipo) {
   let paragrafo = elemento(id);
   paragrafo.textContent = texto;
@@ -156,8 +142,7 @@ function mostrarMensagem(id, texto, tipo) {
   paragrafo.hidden = (texto == '');
 }
 
-// Troca os caracteres especiais do HTML (& < > ") pelos seus códigos, para que
-// um texto digitado pelo usuário apareça na página exatamente como foi escrito.
+// Escapa & < > " antes de pôr texto do usuário em innerHTML (evita XSS).
 function protegerTexto(valor) {
   if (valor === null || valor === undefined) {
     return '';
@@ -183,13 +168,11 @@ function formatarData(texto) {
   return resultado;
 }
 
-// Etiqueta colorida com a classificação de Manchester.
 function etiquetaManchester(cor) {
   return '<span class="manchester ' + cor.toLowerCase() + '">' + cor + ' – ' + manchester[cor].prioridade + '</span>';
 }
 
-// Junta os campos de um formulário (pelo atributo name) em um objeto.
-// Botões de rádio só entram se estiverem marcados.
+// Campos do formulário (pelo name) em um objeto; rádio só entra se marcado.
 function dadosDoFormulario(formulario) {
   let dados = {};
   for (let i = 0; i < formulario.elements.length; i++) {

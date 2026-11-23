@@ -1,17 +1,7 @@
--- =============================================================================
--- script_completo.sql
--- -----------------------------------------------------------------------------
--- Cria o banco pronto_socorro inteiro de uma vez: é a junção, na ordem certa,
--- dos arquivos desta pasta (000, 001, 010, 011, 012, 013, 014, dados_iniciais e 015).
--- Os arquivos numerados continuam aqui como referência.
---
--- MySQL Workbench: File > Open SQL Script > este arquivo > executar (raio).
--- Terminal:        mysql -u root -p < script_completo.sql
---
--- Para recriar o banco do zero, tire o comentário da linha abaixo
--- (ATENÇÃO: apaga todos os dados do banco pronto_socorro).
+-- script_completo.sql: cria o banco inteiro (000, 001, 010–014, dados_iniciais e 015, nessa ordem).
+-- Workbench: File > Open SQL Script > executar. Terminal: mysql -u root -p < script_completo.sql
+-- Para recriar do zero, descomente a linha abaixo (ATENÇÃO: apaga todos os dados).
 -- DROP DATABASE IF EXISTS pronto_socorro;
--- =============================================================================
 
 
 -- >>>>>>>>>>>>>>>>>>>> 000_create_database.sql <<<<<<<<<<<<<<<<<<<<
@@ -21,21 +11,11 @@ USE pronto_socorro;
 
 -- >>>>>>>>>>>>>>>>>>>> 001_schema_base.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 001_schema_base.sql
--- -----------------------------------------------------------------------------
--- Schema base do fluxo de atendimento: pacientes, atendimentos (com o número
--- AT0001), triagens e prescrições. As migrations 010 a 014 completam o
--- modelo (profissionais, vínculos, histórico, consultas e desfechos).
--- Ordem: 000 → 001 → 010 → 011 → 012 → 013 → 014 → dados_iniciais.
---
--- Para recriar o banco inteiro de uma vez: banco/script_completo.sql
--- Requer MySQL 8.0.16+ (CHECK constraints são aplicadas a partir dessa versão).
--- =============================================================================
+-- 001_schema_base.sql: pacientes, atendimentos (número AT0001), triagens e prescrições.
+-- Ordem: 000 → 001 → 010 → 011 → 012 → 013 → 014 → dados_iniciais → 015 (ou tudo em script_completo.sql).
+-- Requer MySQL 8.0.16+ (CHECK constraints).
 
--- RF01: nome completo, endereço, RG, CPF, nome do pai, nome da mãe e nascimento.
--- CPF/RG ficam NULL porque o PS atende quem chega sem documento; nome do pai
--- pode ser desconhecido, e a mãe também (ex.: paciente em situação de rua).
+-- CPF, RG e nome dos pais são opcionais: o PS atende quem chega sem documento (RF01).
 CREATE TABLE IF NOT EXISTS pacientes (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome             VARCHAR(150) NOT NULL,
@@ -51,23 +31,12 @@ CREATE TABLE IF NOT EXISTS pacientes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- -----------------------------------------------------------------------------
--- Número de atendimento AT0001 (RNF03; 4 dígitos a partir da migration 014)
--- -----------------------------------------------------------------------------
--- Por que uma tabela de sequência?
---   * Em um BEFORE INSERT o valor de AUTO_INCREMENT da própria linha ainda não
---     existe (NEW.id = 0), e um AFTER INSERT não pode fazer UPDATE na mesma
---     tabela. Coluna gerada também não pode referenciar AUTO_INCREMENT.
---   * `SELECT MAX(id) + 1` dentro do trigger NÃO é seguro sob concorrência:
---     duas conexões leem o mesmo MAX e geram o mesmo número.
---   * Inserir numa tabela de sequência com AUTO_INCREMENT é atômico no InnoDB e
---     LAST_INSERT_ID() é isolado por conexão → número único mesmo com várias
---     recepções cadastrando ao mesmo tempo.
---
--- Cuidado com LPAD: LPAD('1000', 3, '0') devolve '100' (TRUNCA!). Isso geraria
--- AT100 duplicado a partir do atendimento 1000. Por isso usamos GREATEST(...).
---
--- Observação: se uma transação sofrer ROLLBACK, o número consumido não volta.
--- O número continua único e crescente, mas pode haver "buracos" (AT007 → AT009).
+-- Número de atendimento AT0001 (RNF03; 4 dígitos desde a 014)
+-- Tabela de sequência porque: no BEFORE INSERT o AUTO_INCREMENT ainda não existe, o
+-- AFTER INSERT não pode dar UPDATE na mesma tabela e MAX(id) + 1 duplica sob concorrência.
+-- INSERT na sequência + LAST_INSERT_ID() é atômico e isolado por conexão.
+-- GREATEST no LPAD: LPAD('1000', 3, '0') devolve '100' (trunca e duplicaria o número).
+-- ROLLBACK consome o número: pode haver buracos (AT0007 → AT0009), nunca repetição.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sequencia_atendimento (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -142,31 +111,13 @@ CREATE TABLE IF NOT EXISTS prescricoes (
 
 -- >>>>>>>>>>>>>>>>>>>> 010_recepcionistas_medicos_enfermeiros.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 010_recepcionistas_medicos_enfermeiros.sql
--- -----------------------------------------------------------------------------
--- Cria as entidades de profissionais: recepcionistas, medicos e enfermeiros.
--- Requisitos: RF16, RF17, RF18, RNF08
---
--- Decisões:
---   * Cada perfil tem a sua própria tabela, com as suas próprias credenciais
---     (login + senha_hash). Não existe tabela "usuarios" compartilhada: o perfil
---     de acesso é definido pela tabela em que o profissional está
---     (recepcionistas → RECEPCAO, enfermeiros → ENFERMAGEM, medicos → MEDICO).
---   * O login é único dentro de cada tabela (UNIQUE) e também entre as três
---     (procedure sp_validar_login_unico, chamada pelos triggers). Assim a
---     autenticação encontra no máximo um profissional por login.
---   * FKs que apontam para estas tabelas usam ON UPDATE/DELETE RESTRICT:
---     profissionais nunca são apagados (histórico clínico), apenas desativados
---     (ativo = 0).
---   * CPF é armazenado só com dígitos; a máscara é aplicada na API (RNF09).
---
--- Requer MySQL 8.0.16+. Execute pelo MySQL CLI ou Workbench (usa DELIMITER).
--- =============================================================================
+-- 010_recepcionistas_medicos_enfermeiros.sql (RF16, RF17, RF18, RNF08)
+--   * Uma tabela por perfil, cada uma com login + senha_hash: a tabela define o perfil.
+--   * Login único dentro de cada tabela (UNIQUE) e entre as três (sp_validar_login_unico).
+--   * FKs RESTRICT: profissionais nunca são apagados (histórico clínico), só desativados (ativo = 0).
+--   * CPF só com dígitos; a máscara é aplicada na API (RNF09).
+-- Requer MySQL 8.0.16+ e DELIMITER (MySQL CLI ou Workbench).
 
--- -----------------------------------------------------------------------------
--- RECEPCIONISTAS
--- -----------------------------------------------------------------------------
 CREATE TABLE recepcionistas (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome              VARCHAR(150) NOT NULL,
@@ -191,9 +142,6 @@ CREATE TABLE recepcionistas (
   CONSTRAINT chk_recepcionistas_ativo    CHECK (ativo IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------------------------------
--- MÉDICOS
--- -----------------------------------------------------------------------------
 CREATE TABLE medicos (
   id                      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome                    VARCHAR(150) NOT NULL,
@@ -231,13 +179,8 @@ CREATE TABLE medicos (
   CONSTRAINT chk_medicos_inativo_indisponivel CHECK (ativo = 1 OR status_disponibilidade = 'INDISPONIVEL')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------------------------------
--- ENFERMEIROS
--- categoria: pela Resolução Cofen nº 661/2021, a classificação de risco é
--- privativa do ENFERMEIRO dentro da equipe de enfermagem. Técnicos têm login
--- de enfermagem, mas não registram triagem (regra aplicada no service e no
--- trigger da migration 011).
--- -----------------------------------------------------------------------------
+-- categoria: pela Resolução Cofen 661/2021 só o ENFERMEIRO faz a classificação de risco;
+-- técnicos entram como enfermagem, mas não registram triagem (trigger da migration 011).
 CREATE TABLE enfermeiros (
   id                      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nome                    VARCHAR(150) NOT NULL,
@@ -274,15 +217,9 @@ CREATE TABLE enfermeiros (
   CONSTRAINT chk_enfermeiros_inativo_indisponivel CHECK (ativo = 1 OR status_disponibilidade = 'INDISPONIVEL')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------------------------------
--- LOGIN ÚNICO ENTRE AS TRÊS TABELAS (RNF08)
--- Cada tabela já garante o próprio UNIQUE; a procedure impede que o mesmo login
--- exista em duas tabelas diferentes. p_tabela = tabela de origem (ignorada na
--- busca, porque ali o UNIQUE já cobre).
--- Limite conhecido: dois INSERTs simultâneos do mesmo login em tabelas
--- diferentes podem passar juntos. Cadastro de profissional é raro e feito por
--- administrador, então o risco é aceitável; o service também valida.
--- -----------------------------------------------------------------------------
+-- Login único entre as três tabelas (RNF08); p_tabela é ignorada porque ali o UNIQUE já cobre.
+-- Limite conhecido: dois INSERTs simultâneos do mesmo login em tabelas diferentes podem passar
+-- (aceitável: cadastro de profissional é raro e feito pelo administrador).
 DROP TRIGGER IF EXISTS trg_recepcionistas_bi_login;
 DROP TRIGGER IF EXISTS trg_recepcionistas_bu_login;
 DROP TRIGGER IF EXISTS trg_medicos_bi_login;
@@ -354,32 +291,15 @@ DELIMITER ;
 
 -- >>>>>>>>>>>>>>>>>>>> 011_integracao_atendimento_triagem_prescricao.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 011_integracao_atendimento_triagem_prescricao.sql
--- -----------------------------------------------------------------------------
--- Vincula profissionais ao fluxo recepção → triagem → médico → alta.
--- Requisitos: RF04, RF05, RF15, RF19, RF20, RF21, RNF04, RNF05, RNF10
---
---   atendimentos.medico_id   NULL até o médico chamar o paciente; obrigatório a
---                            partir de EM_ATENDIMENTO_MEDICO e imutável depois.
---   triagens.enfermeiro_id   NOT NULL (triagem sempre tem enfermeiro responsável)
---   prescricoes.medico_id    NOT NULL (prescrição sempre tem médico responsável)
---
--- ⚠️ BANCO COM DADOS: se já existirem triagens/prescrições, o MODIFY ... NOT NULL
---    abaixo falha com "Invalid use of NULL value". Nesse caso, faça o backfill
---    (UPDATE triagens SET enfermeiro_id = <id> WHERE enfermeiro_id IS NULL) antes.
---
--- A regra do número AT0001 (RNF03) NÃO é alterada por esta migration.
--- Execute pelo MySQL CLI ou Workbench (usa DELIMITER). Requer MySQL 8.0.16+.
--- =============================================================================
+-- 011_integracao_atendimento_triagem_prescricao.sql (RF04, RF05, RF15, RF19–RF21, RNF04, RNF05, RNF10)
+-- Vincula profissionais ao fluxo: triagens.enfermeiro_id e prescricoes.medico_id passam a NOT NULL;
+-- atendimentos.medico_id (trocado pela tabela consultas na 013).
+-- ⚠️ BANCO COM DADOS: o MODIFY ... NOT NULL falha se houver triagens/prescrições sem profissional;
+--    faça antes o backfill (UPDATE triagens SET enfermeiro_id = <id> WHERE enfermeiro_id IS NULL).
+-- Requer MySQL 8.0.16+ e DELIMITER.
 
--- -----------------------------------------------------------------------------
--- ATENDIMENTOS ← MÉDICO
--- medico_em_atendimento_id: coluna gerada que só tem valor enquanto o
--- atendimento está EM_ATENDIMENTO_MEDICO. O índice UNIQUE garante, no próprio
--- banco e sob concorrência, que um médico conduz no máximo 1 atendimento ativo
--- por vez (RF20). Valores NULL não conflitam em índice UNIQUE.
--- -----------------------------------------------------------------------------
+-- medico_em_atendimento_id só tem valor em EM_ATENDIMENTO_MEDICO: o índice UNIQUE garante no
+-- banco um atendimento ativo por médico (RF20), pois NULL não conflita em UNIQUE.
 ALTER TABLE atendimentos
   ADD COLUMN medico_id INT UNSIGNED NULL AFTER paciente_id,
   ADD COLUMN medico_em_atendimento_id INT UNSIGNED
@@ -390,9 +310,6 @@ ALTER TABLE atendimentos
   ADD CONSTRAINT fk_atendimentos_medico FOREIGN KEY (medico_id) REFERENCES medicos (id)
     ON UPDATE RESTRICT ON DELETE RESTRICT;
 
--- -----------------------------------------------------------------------------
--- TRIAGENS ← ENFERMEIRO
--- -----------------------------------------------------------------------------
 ALTER TABLE triagens
   ADD COLUMN enfermeiro_id INT UNSIGNED NULL AFTER atendimento_id;
 
@@ -405,9 +322,6 @@ ALTER TABLE triagens
   ADD CONSTRAINT fk_triagens_enfermeiro FOREIGN KEY (enfermeiro_id) REFERENCES enfermeiros (id)
     ON UPDATE RESTRICT ON DELETE RESTRICT;
 
--- -----------------------------------------------------------------------------
--- PRESCRIÇÕES ← MÉDICO
--- -----------------------------------------------------------------------------
 ALTER TABLE prescricoes
   ADD COLUMN medico_id INT UNSIGNED NULL AFTER atendimento_id;
 
@@ -419,11 +333,7 @@ ALTER TABLE prescricoes
   ADD CONSTRAINT fk_prescricoes_medico FOREIGN KEY (medico_id) REFERENCES medicos (id)
     ON UPDATE RESTRICT ON DELETE RESTRICT;
 
--- -----------------------------------------------------------------------------
--- TRIGGERS (defesa em profundidade: o service valida primeiro, o banco garante)
--- Se já existirem triggers com as mesmas regras (ex.: RF15), não há conflito:
--- o MySQL 8 permite vários triggers no mesmo evento, desde que com nomes distintos.
--- -----------------------------------------------------------------------------
+-- Triggers: defesa em profundidade (o service valida primeiro, o banco garante).
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_medico;
 DROP TRIGGER IF EXISTS trg_atendimentos_bu_medico;
 DROP TRIGGER IF EXISTS trg_triagens_bi_enfermeiro;
@@ -546,16 +456,8 @@ DELIMITER ;
 
 -- >>>>>>>>>>>>>>>>>>>> 012_historico_status.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 012_historico_status.sql
--- =============================================================================
--- Histórico de mudanças de status do atendimento (RF14). Os valores de status
--- são os mesmos de atendimentos.status (001). A tabela é criada depois de 010
--- e 011 porque depende de recepcionistas, medicos, enfermeiros e atendimentos.
---
--- Quem alterou o status (RF14): como cada perfil tem a sua própria tabela, há
--- uma FK por tabela de profissional. O CHECK exige exatamente uma preenchida.
--- =============================================================================
+-- 012_historico_status.sql: histórico de status do atendimento (RF14).
+-- Uma FK por tabela de profissional; o CHECK exige exatamente uma preenchida.
 
 CREATE TABLE IF NOT EXISTS historico_status (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -590,66 +492,30 @@ CREATE TABLE IF NOT EXISTS historico_status (
 
 -- >>>>>>>>>>>>>>>>>>>> 013_fluxo_etapas_consulta_desfecho.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 013_fluxo_etapas_consulta_desfecho.sql
--- -----------------------------------------------------------------------------
--- Refatoração do MER/DER: o atendimento passa a ser modelado como um PROCESSO
--- em etapas, não como ator do sistema.
---
+-- 013_fluxo_etapas_consulta_desfecho.sql: o atendimento passa a ser um processo em etapas.
 --   Chegada → Atendimento Inicial → Triagem → Consulta → Desfecho
---
--- Cada etapa clínica tem a sua entidade e o seu profissional responsável:
---   atendimentos  (Atendimento Inicial)  ← recepcionista (historico_status)
---   triagens      (Triagem)              ← enfermeiro
---   consultas     (Consulta)             ← médico            [NOVA]
---   desfechos     (Desfecho)             ← médico, via consulta [NOVA]
---
--- O que muda:
---   1. Atendimento perde os dados do médico (medico_id, confirmado_medico_em e
---      a coluna gerada medico_em_atendimento_id). O vínculo com o médico passa
---      para a nova tabela consultas, que também garante RF20 (um médico, no
---      máximo uma consulta aberta) com índice único em coluna gerada.
---   2. Status do atendimento descrevem a etapa, não o médico:
---        AGUARDANDO_MEDICO      → AGUARDANDO_CONSULTA
---        EM_ATENDIMENTO_MEDICO  → EM_CONSULTA
---   3. Médico ganha status operacional próprio (medicos.status_operacional):
---        EM_PLANTAO | EM_CONSULTA (só o sistema) | PAUSA | FOLGA | LICENCA
---        DISPONIVEL → EM_PLANTAO, EM_ATENDIMENTO → EM_CONSULTA,
---        INDISPONIVEL → FOLGA
---      com histórico automático em historico_status_medico.
---   4. Desfecho da consulta (desfechos): PRESCRICAO, EXAMES, ENCAMINHAMENTO
---      ou ALTA, com descrição obrigatória. Sem desfecho não há finalização.
---   5. Histórico de etapas do paciente (historico_etapas): uma linha por etapa,
---      com a descrição textual (VARCHAR) do que aconteceu.
---   6. RG fica VARCHAR(9) em todas as tabelas (profissionais saem de VARCHAR(20)),
---      com CHECK de formato (mesma regra do validador da API: 5 a 9 dígitos ou X).
---   7. NOT NULL / CHECK de coerência: atendimento FINALIZADO ⇔ finalizado_em.
---
--- ⚠️ BANCO COM DADOS:
---   * RG com mais de 9 caracteres faz o MODIFY falhar. Confira antes:
+--   * consultas (nova): recebe o vínculo com o médico que estava em atendimentos.
+--   * Status do atendimento nomeiam a etapa: AGUARDANDO_MEDICO → AGUARDANDO_CONSULTA,
+--     EM_ATENDIMENTO_MEDICO → EM_CONSULTA.
+--   * medicos.status_operacional: EM_PLANTAO | EM_CONSULTA (só o sistema) | PAUSA | FOLGA | LICENCA,
+--     com histórico em historico_status_medico.
+--   * desfechos (nova): PRESCRICAO, EXAMES, ENCAMINHAMENTO ou ALTA; sem desfecho não há finalização.
+--   * historico_etapas (nova): uma linha por etapa percorrida.
+--   * RG VARCHAR(9) com CHECK de formato em todas as tabelas; FINALIZADO ⇔ finalizado_em.
+-- ⚠️ BANCO COM DADOS: RG com mais de 9 caracteres faz o MODIFY falhar. Confira antes:
 --       SELECT 'pacientes' t, id, rg FROM pacientes WHERE CHAR_LENGTH(rg) > 9
 --       UNION ALL SELECT 'recepcionistas', id, rg FROM recepcionistas WHERE CHAR_LENGTH(rg) > 9
 --       UNION ALL SELECT 'medicos', id, rg FROM medicos WHERE CHAR_LENGTH(rg) > 9
 --       UNION ALL SELECT 'enfermeiros', id, rg FROM enfermeiros WHERE CHAR_LENGTH(rg) > 9;
---   * Atendimentos e históricos existentes são convertidos (status renomeados,
---     consultas, desfechos e etapas preenchidos a partir dos dados atuais).
---
--- Ordem das seções importa: os triggers novos são criados só no FINAL, depois
--- da conversão dos dados (eles bloqueariam o backfill de registros finalizados).
--- Requer MySQL 8.0.16+. Execute pelo MySQL CLI ou Workbench (ou use script_completo.sql).
--- =============================================================================
+-- Os triggers novos ficam no FINAL: antes, bloqueariam a conversão dos registros finalizados.
+-- Requer MySQL 8.0.16+ e DELIMITER (ou use script_completo.sql).
 
--- -----------------------------------------------------------------------------
--- 1. Triggers da 011 que dependem das colunas/valores que vão mudar.
---    trg_triagens_* e trg_prescricoes_bu_bloqueio continuam válidos.
--- -----------------------------------------------------------------------------
+-- 1. Remove os triggers da 011 que dependem de colunas/valores que vão mudar.
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_medico;
 DROP TRIGGER IF EXISTS trg_atendimentos_bu_medico;
 DROP TRIGGER IF EXISTS trg_prescricoes_bi_medico;
 
--- -----------------------------------------------------------------------------
 -- 2. RG: VARCHAR(20) → VARCHAR(9) + CHECK de formato
--- -----------------------------------------------------------------------------
 ALTER TABLE pacientes
   MODIFY COLUMN rg VARCHAR(9) NULL,
   ADD CONSTRAINT chk_pacientes_rg CHECK (rg IS NULL OR rg REGEXP '^[0-9X]{5,9}$');
@@ -666,12 +532,8 @@ ALTER TABLE enfermeiros
   MODIFY COLUMN rg VARCHAR(9) NULL,
   ADD CONSTRAINT chk_enfermeiros_rg CHECK (rg IS NULL OR rg REGEXP '^[0-9X]{5,9}$');
 
--- -----------------------------------------------------------------------------
--- 3. CONSULTAS (etapa Consulta) — recebe o vínculo com o médico
--- medico_em_consulta_id: só tem valor enquanto a consulta está aberta. O índice
--- UNIQUE garante, no banco e sob concorrência, que um médico conduz no máximo
--- uma consulta por vez (RF20). NULL não conflita em índice UNIQUE.
--- -----------------------------------------------------------------------------
+-- 3. CONSULTAS. medico_em_consulta_id só tem valor com a consulta aberta: o UNIQUE garante
+--    uma consulta por médico (RF20), pois NULL não conflita em UNIQUE.
 CREATE TABLE consultas (
   id                     INT UNSIGNED NOT NULL AUTO_INCREMENT,
   atendimento_id         INT UNSIGNED NOT NULL,
@@ -702,9 +564,7 @@ SELECT a.id,
   FROM atendimentos a
  WHERE a.medico_id IS NOT NULL;
 
--- -----------------------------------------------------------------------------
--- 4. ATENDIMENTOS: sai a indicação do médico; status passam a nomear a etapa
--- -----------------------------------------------------------------------------
+-- 4. ATENDIMENTOS: sai o médico; os status passam a nomear a etapa
 ALTER TABLE atendimentos
   DROP INDEX uk_atendimentos_medico_em_atendimento,
   DROP COLUMN medico_em_atendimento_id;
@@ -744,9 +604,7 @@ ALTER TABLE atendimentos
                        NOT NULL DEFAULT 'AGUARDANDO_TRIAGEM',
   ADD CONSTRAINT chk_atendimentos_finalizacao CHECK ((status = 'FINALIZADO') = (finalizado_em IS NOT NULL));
 
--- -----------------------------------------------------------------------------
 -- 5. HISTÓRICO DE STATUS DO ATENDIMENTO: mesmos valores novos
--- -----------------------------------------------------------------------------
 ALTER TABLE historico_status
   MODIFY COLUMN status_anterior ENUM('AGUARDANDO_TRIAGEM','AGUARDANDO_MEDICO','EM_ATENDIMENTO_MEDICO',
                                      'AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO') NULL,
@@ -771,12 +629,7 @@ ALTER TABLE historico_status
   MODIFY COLUMN status_anterior ENUM('AGUARDANDO_TRIAGEM','AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO') NULL,
   MODIFY COLUMN status_novo     ENUM('AGUARDANDO_TRIAGEM','AGUARDANDO_CONSULTA','EM_CONSULTA','FINALIZADO','CANCELADO') NOT NULL;
 
--- -----------------------------------------------------------------------------
--- 6. DESFECHOS (etapa Desfecho/Finalização) — um por consulta
--- O médico responsável é o da consulta (sem coluna duplicada).
--- tipo: PRESCRICAO (alta com receita; itens em prescricoes), EXAMES (alta com
--- pedido de exames), ENCAMINHAMENTO (exige destino) ou ALTA (alta simples).
--- -----------------------------------------------------------------------------
+-- 6. DESFECHOS: um por consulta; o médico responsável é o da consulta.
 CREATE TABLE desfechos (
   id                      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   consulta_id             INT UNSIGNED NOT NULL,
@@ -804,11 +657,7 @@ SELECT c.id,
   FROM consultas c
  WHERE c.finalizada_em IS NOT NULL;
 
--- -----------------------------------------------------------------------------
--- 7. HISTÓRICO DE ETAPAS DO PACIENTE
--- Uma linha por etapa percorrida, com a descrição textual do que aconteceu.
--- Cada etapa acontece no máximo uma vez por atendimento.
--- -----------------------------------------------------------------------------
+-- 7. HISTÓRICO DE ETAPAS: cada etapa no máximo uma vez por atendimento.
 CREATE TABLE historico_etapas (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   atendimento_id  INT UNSIGNED NOT NULL,
@@ -855,10 +704,8 @@ SELECT c.atendimento_id, 'DESFECHO',
   FROM desfechos d
   JOIN consultas c ON c.id = d.consulta_id;
 
--- -----------------------------------------------------------------------------
--- 8. MÉDICOS: status operacional próprio
--- O CHECK e o índice antigos citam status_disponibilidade: saem antes do rename.
--- -----------------------------------------------------------------------------
+-- 8. MÉDICOS: status operacional próprio. O CHECK e o índice antigos citam
+--    status_disponibilidade: saem antes do rename.
 ALTER TABLE medicos
   DROP CHECK chk_medicos_inativo_indisponivel,
   DROP INDEX idx_medicos_disponibilidade;
@@ -885,9 +732,7 @@ ALTER TABLE medicos
   -- Profissional desativado não pode ficar na escala do plantão.
   ADD CONSTRAINT chk_medicos_inativo_fora_do_plantao CHECK (ativo = 1 OR status_operacional IN ('FOLGA', 'LICENCA'));
 
--- -----------------------------------------------------------------------------
--- 9. HISTÓRICO DE STATUS DO MÉDICO (alimentado por trigger, seção 10)
--- -----------------------------------------------------------------------------
+-- 9. HISTÓRICO DE STATUS DO MÉDICO (alimentado pelo trigger da seção 10)
 CREATE TABLE historico_status_medico (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
   medico_id        INT UNSIGNED NOT NULL,
@@ -906,9 +751,7 @@ INSERT INTO historico_status_medico (medico_id, status_anterior, status_novo, da
 SELECT m.id, NULL, m.status_operacional, m.atualizado_em
   FROM medicos m;
 
--- -----------------------------------------------------------------------------
 -- 10. TRIGGERS (defesa em profundidade: o service valida primeiro, o banco garante)
--- -----------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_status;
 DROP TRIGGER IF EXISTS trg_atendimentos_bu_bloqueio;
 DROP TRIGGER IF EXISTS trg_consultas_bi_medico;
@@ -1073,14 +916,7 @@ DELIMITER ;
 
 -- >>>>>>>>>>>>>>>>>>>> 014_numero_atendimento_4_digitos.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 014_numero_atendimento_4_digitos.sql
--- -----------------------------------------------------------------------------
--- Ajuste do número de atendimento para o formato do descritivo do projeto,
--- que usa como exemplo "AT0001" (4 dígitos). O trigger original (001) gerava
--- "AT001" (3 dígitos). A única mudança é o 3 → 4 dentro do GREATEST.
--- Continua único e sequencial mesmo com cadastros simultâneos (RNF03).
--- =============================================================================
+-- 014_numero_atendimento_4_digitos.sql: AT001 → AT0001 (formato do descritivo); só muda o 3 → 4 no GREATEST.
 
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_numero;
 
@@ -1098,23 +934,12 @@ DELIMITER ;
 
 -- >>>>>>>>>>>>>>>>>>>> dados_iniciais.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- dados_iniciais.sql
--- -----------------------------------------------------------------------------
--- Profissionais do plantão e alguns pacientes de exemplo para demonstração.
--- Executar DEPOIS dos scripts 000 a 014.
---
--- Entrada no sistema: perfil + login + senha. Todos os profissionais de
--- exemplo usam a senha  senha123  (só para demonstração). A coluna senha_hash
--- guarda o hash scrypt da senha (modulos/senhas.js), nunca a senha em si.
--- Para gerar o hash de outra senha:  node modulos/senhas.js "novaSenha1"
--- =============================================================================
+-- dados_iniciais.sql: profissionais e pacientes de exemplo. Executar depois dos scripts 000 a 014.
+-- Todos os profissionais usam a senha  senha123  (só demonstração); senha_hash guarda o hash scrypt.
+-- Hash de outra senha: node modulos/senhas.js "novaSenha1"
 
 USE pronto_socorro;
 
--- -----------------------------------------------------------------------------
--- PROFISSIONAIS
--- -----------------------------------------------------------------------------
 INSERT INTO recepcionistas (nome, cpf, rg, data_nascimento, telefone, email, login, senha_hash) VALUES
   ('Ana Paula Souza',     '52998224725', '284731905', '1992-04-10', '19991234567', 'ana.souza@exemplo.com',  'ana.souza',  'scrypt$f59e5e76677a5f5229491a76e7ea8f10$98f431f6e18e6ac29e550f6b293e2b0b8b6f84701b094dd15cd00f9cd7f6561d41589c32d9bbe81ca25b36e19bac5ddbd2739bf317d52191e6206d3d909cbcbb'),
   ('Bruno Henrique Dias', '11144477735', '193847562', '1988-09-22', '19992345678', 'bruno.dias@exemplo.com', 'bruno.dias', 'scrypt$7d60525d07c690785a61dde70fd7970e$c5dbb1f15ea61d045e9f39e15758e7a1b4817b8b87d92554dddf1f68cf6151a53d18bc94e3d910c82b4bfde7daeb16ec3994de256c0b6152ee45f592260360fe');
@@ -1137,12 +962,8 @@ SET @recepcionista = (SELECT id FROM recepcionistas WHERE login = 'ana.souza');
 SET @enfermeiro    = (SELECT id FROM enfermeiros    WHERE login = 'marina.lopes');
 SET @agora         = NOW();
 
--- -----------------------------------------------------------------------------
--- PACIENTES DE EXEMPLO
--- Os 3 primeiros já passaram pela triagem (aparecem no Painel do Médico, fora
--- de ordem de chegada para mostrar a ordenação por Manchester). Os 3 últimos
--- estão aguardando triagem.
--- -----------------------------------------------------------------------------
+-- Pacientes de exemplo: os 3 primeiros já triados (fora da ordem de chegada, para mostrar
+-- a ordenação por Manchester); os 3 últimos aguardam triagem.
 INSERT INTO pacientes (nome, endereco, cpf, rg, nome_pai, nome_mae, data_nascimento) VALUES
   ('João Pedro Oliveira',    'Rua Barão de Jaguara, 450 - Centro, Campinas/SP',      '13579246828', '738291045', 'Pedro Oliveira',   'Sandra Oliveira',  '1990-07-25'),
   ('Antônio Carlos Ribeiro', 'Av. Francisco Glicério, 1200 - Centro, Campinas/SP',   '31415926590', '829104536', 'Carlos Ribeiro',   'Lúcia Ribeiro',    '1947-09-14'),
@@ -1151,8 +972,7 @@ INSERT INTO pacientes (nome, endereco, cpf, rg, nome_pai, nome_mae, data_nascime
   ('Lucas Ferreira Lima',    'Av. John Boyd Dunlop, 3900 - Jd. Ipaussurama, Campinas/SP', NULL,     NULL,        'Roberto Lima',     'Cláudia Ferreira', '2001-11-02'),
   ('Fernanda Gomes Costa',   'Rua Sacramento, 300 - Cambuí, Campinas/SP',            NULL,          '536278190', NULL,               'Patrícia Gomes',   '1996-01-08');
 
--- Abre um atendimento por paciente, com o histórico de status e de etapas.
--- O número AT0001, AT0002... é gerado pelo trigger trg_atendimentos_bi_numero.
+-- Um atendimento por paciente; o número AT0001... vem do trigger trg_atendimentos_bi_numero.
 INSERT INTO atendimentos (paciente_id, criado_em)
 SELECT p.id,
        CASE p.nome
@@ -1220,17 +1040,8 @@ SELECT t.atendimento_id, 'TRIAGEM',
 
 -- >>>>>>>>>>>>>>>>>>>> 015_senhas_profissionais.sql <<<<<<<<<<<<<<<<<<<<
 
--- =============================================================================
--- 015_senhas_profissionais.sql
--- -----------------------------------------------------------------------------
--- A entrada no sistema passa a exigir login + senha (RNF08). A estrutura não
--- muda: as colunas login, senha_hash e ultimo_login_em já existiam (010).
--- Este script só serve para bancos criados ANTES desta mudança, cujos
--- profissionais de exemplo têm senha_hash = 'login-nao-utilizado': ele grava
--- o hash scrypt da senha de demonstração  senha123  para cada um deles.
--- Em banco novo (script_completo.sql) não altera nada, pois os dados
--- iniciais já vêm com os hashes.
--- =============================================================================
+-- 015_senhas_profissionais.sql: só para bancos criados antes da senha (senha_hash = 'login-nao-utilizado').
+-- Grava o hash scrypt de senha123 nos profissionais de exemplo; em banco novo não altera nada.
 
 UPDATE recepcionistas SET senha_hash = 'scrypt$f59e5e76677a5f5229491a76e7ea8f10$98f431f6e18e6ac29e550f6b293e2b0b8b6f84701b094dd15cd00f9cd7f6561d41589c32d9bbe81ca25b36e19bac5ddbd2739bf317d52191e6206d3d909cbcbb'
  WHERE login = 'ana.souza' AND senha_hash = 'login-nao-utilizado';

@@ -1,6 +1,4 @@
-// Tela da CONSULTA MÉDICA: o médico vê os dados do paciente e da triagem,
-// registra as medicações e confirma (finaliza) o atendimento.
-// O médico é quem entrou no sistema: o servidor o identifica pela sessão.
+// Consulta médica: dados do paciente, medicações e finalização. O médico vem da sessão.
 
 let consultaAtual = null;
 
@@ -70,9 +68,6 @@ function mostrarConsulta(c, prescricoes) {
   elemento('consulta').hidden = false;
 }
 
-// ---------------------------------------------------------------------------
-// MEDICAÇÕES
-// ---------------------------------------------------------------------------
 elemento('formPrescricao').onsubmit = function (evento) {
   evento.preventDefault();
   let dados = dadosDoFormulario(elemento('formPrescricao'));
@@ -89,9 +84,6 @@ elemento('formPrescricao').onsubmit = function (evento) {
   });
 };
 
-// ---------------------------------------------------------------------------
-// CONFIRMAÇÃO / FINALIZAÇÃO
-// ---------------------------------------------------------------------------
 // O destino só é pedido quando o desfecho é um encaminhamento.
 elemento('tipoDesfecho').onchange = function () {
   let encaminhamento = (elemento('tipoDesfecho').value == 'ENCAMINHAMENTO');

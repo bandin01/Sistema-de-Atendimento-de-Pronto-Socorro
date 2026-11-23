@@ -1,5 +1,4 @@
-// Módulo do MÉDICO: painel de atendimentos, chamada do próximo paciente,
-// registro de medicações e finalização (confirmação) do atendimento.
+// Médico: painel, chamar próximo, medicações e finalização com desfecho.
 let banco = require('./banco');
 let historico = require('./historico');
 let util = require('./utilitarios');
@@ -8,11 +7,10 @@ let vias = ['ORAL', 'SUBLINGUAL', 'INTRAVENOSA', 'INTRAMUSCULAR', 'SUBCUTANEA', 
             'NASAL', 'TOPICA', 'OFTALMICA', 'RETAL', 'OUTRA'];
 let tiposDesfecho = ['PRESCRICAO', 'EXAMES', 'ENCAMINHAMENTO', 'ALTA'];
 
-// Ordem do protocolo de Manchester, usada no ORDER BY do painel e da chamada.
+// Ordem de Manchester no ORDER BY do painel e da chamada (RF09).
 let ordemManchester = "FIELD(t.classificacao_manchester, 'VERMELHO', 'LARANJA', 'AMARELO', 'VERDE', 'AZUL')";
 
-// PAINEL (RF09, RF10): pacientes já triados, esperando o médico, na ordem de
-// Manchester; dentro da mesma cor, quem foi triado primeiro vem antes.
+// PAINEL (RF09, RF10): na mesma cor, quem foi triado primeiro vem antes.
 exports.painel = function (callback) {
   let sql = 'SELECT a.numero_atendimento, p.nome, p.data_nascimento, ' +
             'TIMESTAMPDIFF(YEAR, p.data_nascimento, CURDATE()) AS idade, ' +
@@ -26,7 +24,6 @@ exports.painel = function (callback) {
   banco.executar(sql, [], callback);
 };
 
-// Marca o atendimento como EM_CONSULTA, abre a consulta e coloca o médico em consulta.
 function abrirConsulta(conexao, medicoId, atendimentoId, callback) {
   // O "AND status = ..." garante que dois médicos não peguem o mesmo paciente.
   let sql = "UPDATE atendimentos SET status = 'EM_CONSULTA' WHERE id = ? AND status = 'AGUARDANDO_CONSULTA'";
@@ -44,9 +41,7 @@ function abrirConsulta(conexao, medicoId, atendimentoId, callback) {
   });
 }
 
-// CHAMAR PRÓXIMO: o médico chama o paciente de maior prioridade. Este é o
-// momento da CONFIRMAÇÃO MÉDICA: depois dele a recepção não altera nem
-// cancela mais o atendimento.
+// CHAMAR PRÓXIMO = confirmação médica: depois dela a recepção não altera nem cancela.
 exports.chamarProximo = function (dados, callback) {
   let medicoId = parseInt(dados.medico_id, 10);
   if (isNaN(medicoId)) {
@@ -106,8 +101,7 @@ exports.chamarProximo = function (dados, callback) {
   }, callback);
 };
 
-// Dados da consulta em andamento do médico (RF11): paciente, triagem e medicações.
-// Não devolve CPF nem RG: o médico não precisa deles (RNF09).
+// Consulta aberta do médico (RF11). Sem CPF/RG: o médico não precisa deles (RNF09).
 exports.consultaAberta = function (medicoId, callback) {
   medicoId = parseInt(medicoId, 10);
   if (isNaN(medicoId)) {
@@ -156,10 +150,8 @@ exports.consultaAberta = function (medicoId, callback) {
   });
 };
 
-// SITUAÇÃO DO MÉDICO: o próprio médico escolhe se está em plantão, em pausa,
-// de folga ou de licença. EM_CONSULTA não é escolhido: o sistema define ao
-// chamar o paciente e tira ao registrar o desfecho. Toda mudança é gravada
-// pelo banco em historico_status_medico (trigger trg_medicos_au_status).
+// EM_CONSULTA não é escolhida pelo médico: o sistema põe ao chamar e tira no desfecho.
+// O histórico é gravado pelo trigger trg_medicos_au_status.
 let situacoesMedico = ['EM_PLANTAO', 'PAUSA', 'FOLGA', 'LICENCA'];
 
 exports.alterarSituacao = function (dados, callback) {
@@ -173,7 +165,7 @@ exports.alterarSituacao = function (dados, callback) {
   }
 
   banco.transacao(function (conexao, concluir) {
-    // FOR UPDATE: a troca não se mistura com uma chamada de paciente ao mesmo tempo.
+    // FOR UPDATE: não se mistura com uma chamada de paciente simultânea.
     let sql = 'SELECT status_operacional FROM medicos WHERE id = ? AND ativo = 1 FOR UPDATE';
     conexao.query(sql, [medicoId], function (err, medicos) {
       if (err) {
@@ -192,8 +184,7 @@ exports.alterarSituacao = function (dados, callback) {
   }, callback);
 };
 
-// MEDICAÇÕES (RF12): só o médico da consulta aberta pode prescrever.
-// O banco também confere (trigger trg_prescricoes_bi_medico).
+// MEDICAÇÕES (RF12): só o médico da consulta aberta (o trigger trg_prescricoes_bi_medico também confere).
 exports.registrarPrescricao = function (dados, callback) {
   let medicoId = parseInt(dados.medico_id, 10);
   let numero = util.numeroAtendimento(dados.numero_atendimento);
@@ -246,8 +237,7 @@ exports.registrarPrescricao = function (dados, callback) {
   });
 };
 
-// FINALIZAÇÃO (RF13): o médico confirma o atendimento registrando o desfecho
-// da consulta (prescrição, pedido de exames, encaminhamento ou alta).
+// FINALIZAÇÃO (RF13): exige o desfecho da consulta.
 exports.finalizar = function (dados, callback) {
   let medicoId = parseInt(dados.medico_id, 10);
   let numero = util.numeroAtendimento(dados.numero_atendimento);
@@ -268,7 +258,7 @@ exports.finalizar = function (dados, callback) {
     return callback(util.erro(400, 'Informe para onde o paciente será encaminhado.'));
   }
   if (tipo != 'ENCAMINHAMENTO') {
-    destino = '';   // o destino só é gravado no encaminhamento
+    destino = '';
   }
 
   banco.transacao(function (conexao, concluir) {
@@ -288,8 +278,7 @@ exports.finalizar = function (dados, callback) {
         return concluir(util.erro(400, 'Para o desfecho Prescrição, registre ao menos uma medicação.'));
       }
 
-      // Desfecho, fim da consulta, fim do atendimento e médico de volta ao plantão.
-      // Os triggers do banco garantem que nada disso aconteça sem o desfecho.
+      // A ordem importa: os triggers só deixam finalizar depois do desfecho gravado.
       banco.executarEmOrdem(conexao, [
         { sql: 'INSERT INTO desfechos (consulta_id, tipo, descricao, destino_encaminhamento) VALUES (?, ?, ?, ?)',
           valores: [consulta.consulta_id, tipo, descricao, util.nuloSeVazio(destino)] },

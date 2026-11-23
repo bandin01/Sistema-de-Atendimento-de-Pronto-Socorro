@@ -1,20 +1,9 @@
--- =============================================================================
--- dados_iniciais.sql
--- -----------------------------------------------------------------------------
--- Profissionais do plantão e alguns pacientes de exemplo para demonstração.
--- Executar DEPOIS dos scripts 000 a 014.
---
--- Entrada no sistema: perfil + login + senha. Todos os profissionais de
--- exemplo usam a senha  senha123  (só para demonstração). A coluna senha_hash
--- guarda o hash scrypt da senha (modulos/senhas.js), nunca a senha em si.
--- Para gerar o hash de outra senha:  node modulos/senhas.js "novaSenha1"
--- =============================================================================
+-- dados_iniciais.sql: profissionais e pacientes de exemplo. Executar depois dos scripts 000 a 014.
+-- Todos os profissionais usam a senha  senha123  (só demonstração); senha_hash guarda o hash scrypt.
+-- Hash de outra senha: node modulos/senhas.js "novaSenha1"
 
 USE pronto_socorro;
 
--- -----------------------------------------------------------------------------
--- PROFISSIONAIS
--- -----------------------------------------------------------------------------
 INSERT INTO recepcionistas (nome, cpf, rg, data_nascimento, telefone, email, login, senha_hash) VALUES
   ('Ana Paula Souza',     '52998224725', '284731905', '1992-04-10', '19991234567', 'ana.souza@exemplo.com',  'ana.souza',  'scrypt$f59e5e76677a5f5229491a76e7ea8f10$98f431f6e18e6ac29e550f6b293e2b0b8b6f84701b094dd15cd00f9cd7f6561d41589c32d9bbe81ca25b36e19bac5ddbd2739bf317d52191e6206d3d909cbcbb'),
   ('Bruno Henrique Dias', '11144477735', '193847562', '1988-09-22', '19992345678', 'bruno.dias@exemplo.com', 'bruno.dias', 'scrypt$7d60525d07c690785a61dde70fd7970e$c5dbb1f15ea61d045e9f39e15758e7a1b4817b8b87d92554dddf1f68cf6151a53d18bc94e3d910c82b4bfde7daeb16ec3994de256c0b6152ee45f592260360fe');
@@ -37,12 +26,8 @@ SET @recepcionista = (SELECT id FROM recepcionistas WHERE login = 'ana.souza');
 SET @enfermeiro    = (SELECT id FROM enfermeiros    WHERE login = 'marina.lopes');
 SET @agora         = NOW();
 
--- -----------------------------------------------------------------------------
--- PACIENTES DE EXEMPLO
--- Os 3 primeiros já passaram pela triagem (aparecem no Painel do Médico, fora
--- de ordem de chegada para mostrar a ordenação por Manchester). Os 3 últimos
--- estão aguardando triagem.
--- -----------------------------------------------------------------------------
+-- Pacientes de exemplo: os 3 primeiros já triados (fora da ordem de chegada, para mostrar
+-- a ordenação por Manchester); os 3 últimos aguardam triagem.
 INSERT INTO pacientes (nome, endereco, cpf, rg, nome_pai, nome_mae, data_nascimento) VALUES
   ('João Pedro Oliveira',    'Rua Barão de Jaguara, 450 - Centro, Campinas/SP',      '13579246828', '738291045', 'Pedro Oliveira',   'Sandra Oliveira',  '1990-07-25'),
   ('Antônio Carlos Ribeiro', 'Av. Francisco Glicério, 1200 - Centro, Campinas/SP',   '31415926590', '829104536', 'Carlos Ribeiro',   'Lúcia Ribeiro',    '1947-09-14'),
@@ -51,8 +36,7 @@ INSERT INTO pacientes (nome, endereco, cpf, rg, nome_pai, nome_mae, data_nascime
   ('Lucas Ferreira Lima',    'Av. John Boyd Dunlop, 3900 - Jd. Ipaussurama, Campinas/SP', NULL,     NULL,        'Roberto Lima',     'Cláudia Ferreira', '2001-11-02'),
   ('Fernanda Gomes Costa',   'Rua Sacramento, 300 - Cambuí, Campinas/SP',            NULL,          '536278190', NULL,               'Patrícia Gomes',   '1996-01-08');
 
--- Abre um atendimento por paciente, com o histórico de status e de etapas.
--- O número AT0001, AT0002... é gerado pelo trigger trg_atendimentos_bi_numero.
+-- Um atendimento por paciente; o número AT0001... vem do trigger trg_atendimentos_bi_numero.
 INSERT INTO atendimentos (paciente_id, criado_em)
 SELECT p.id,
        CASE p.nome

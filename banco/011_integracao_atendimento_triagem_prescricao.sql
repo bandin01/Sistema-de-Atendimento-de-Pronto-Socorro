@@ -1,29 +1,12 @@
--- =============================================================================
--- 011_integracao_atendimento_triagem_prescricao.sql
--- -----------------------------------------------------------------------------
--- Vincula profissionais ao fluxo recepção → triagem → médico → alta.
--- Requisitos: RF04, RF05, RF15, RF19, RF20, RF21, RNF04, RNF05, RNF10
---
---   atendimentos.medico_id   NULL até o médico chamar o paciente; obrigatório a
---                            partir de EM_ATENDIMENTO_MEDICO e imutável depois.
---   triagens.enfermeiro_id   NOT NULL (triagem sempre tem enfermeiro responsável)
---   prescricoes.medico_id    NOT NULL (prescrição sempre tem médico responsável)
---
--- ⚠️ BANCO COM DADOS: se já existirem triagens/prescrições, o MODIFY ... NOT NULL
---    abaixo falha com "Invalid use of NULL value". Nesse caso, faça o backfill
---    (UPDATE triagens SET enfermeiro_id = <id> WHERE enfermeiro_id IS NULL) antes.
---
--- A regra do número AT0001 (RNF03) NÃO é alterada por esta migration.
--- Execute pelo MySQL CLI ou Workbench (usa DELIMITER). Requer MySQL 8.0.16+.
--- =============================================================================
+-- 011_integracao_atendimento_triagem_prescricao.sql (RF04, RF05, RF15, RF19–RF21, RNF04, RNF05, RNF10)
+-- Vincula profissionais ao fluxo: triagens.enfermeiro_id e prescricoes.medico_id passam a NOT NULL;
+-- atendimentos.medico_id (trocado pela tabela consultas na 013).
+-- ⚠️ BANCO COM DADOS: o MODIFY ... NOT NULL falha se houver triagens/prescrições sem profissional;
+--    faça antes o backfill (UPDATE triagens SET enfermeiro_id = <id> WHERE enfermeiro_id IS NULL).
+-- Requer MySQL 8.0.16+ e DELIMITER.
 
--- -----------------------------------------------------------------------------
--- ATENDIMENTOS ← MÉDICO
--- medico_em_atendimento_id: coluna gerada que só tem valor enquanto o
--- atendimento está EM_ATENDIMENTO_MEDICO. O índice UNIQUE garante, no próprio
--- banco e sob concorrência, que um médico conduz no máximo 1 atendimento ativo
--- por vez (RF20). Valores NULL não conflitam em índice UNIQUE.
--- -----------------------------------------------------------------------------
+-- medico_em_atendimento_id só tem valor em EM_ATENDIMENTO_MEDICO: o índice UNIQUE garante no
+-- banco um atendimento ativo por médico (RF20), pois NULL não conflita em UNIQUE.
 ALTER TABLE atendimentos
   ADD COLUMN medico_id INT UNSIGNED NULL AFTER paciente_id,
   ADD COLUMN medico_em_atendimento_id INT UNSIGNED
@@ -34,9 +17,6 @@ ALTER TABLE atendimentos
   ADD CONSTRAINT fk_atendimentos_medico FOREIGN KEY (medico_id) REFERENCES medicos (id)
     ON UPDATE RESTRICT ON DELETE RESTRICT;
 
--- -----------------------------------------------------------------------------
--- TRIAGENS ← ENFERMEIRO
--- -----------------------------------------------------------------------------
 ALTER TABLE triagens
   ADD COLUMN enfermeiro_id INT UNSIGNED NULL AFTER atendimento_id;
 
@@ -49,9 +29,6 @@ ALTER TABLE triagens
   ADD CONSTRAINT fk_triagens_enfermeiro FOREIGN KEY (enfermeiro_id) REFERENCES enfermeiros (id)
     ON UPDATE RESTRICT ON DELETE RESTRICT;
 
--- -----------------------------------------------------------------------------
--- PRESCRIÇÕES ← MÉDICO
--- -----------------------------------------------------------------------------
 ALTER TABLE prescricoes
   ADD COLUMN medico_id INT UNSIGNED NULL AFTER atendimento_id;
 
@@ -63,11 +40,7 @@ ALTER TABLE prescricoes
   ADD CONSTRAINT fk_prescricoes_medico FOREIGN KEY (medico_id) REFERENCES medicos (id)
     ON UPDATE RESTRICT ON DELETE RESTRICT;
 
--- -----------------------------------------------------------------------------
--- TRIGGERS (defesa em profundidade: o service valida primeiro, o banco garante)
--- Se já existirem triggers com as mesmas regras (ex.: RF15), não há conflito:
--- o MySQL 8 permite vários triggers no mesmo evento, desde que com nomes distintos.
--- -----------------------------------------------------------------------------
+-- Triggers: defesa em profundidade (o service valida primeiro, o banco garante).
 DROP TRIGGER IF EXISTS trg_atendimentos_bi_medico;
 DROP TRIGGER IF EXISTS trg_atendimentos_bu_medico;
 DROP TRIGGER IF EXISTS trg_triagens_bi_enfermeiro;

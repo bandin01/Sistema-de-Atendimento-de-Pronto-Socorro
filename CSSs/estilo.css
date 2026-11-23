@@ -1,5 +1,3 @@
-/* Folha de estilos do Sistema de Atendimento de Pronto Socorro */
-
 * {
   box-sizing: border-box;
 }
@@ -9,8 +7,7 @@
   display: none !important;
 }
 
-/* Layout da página com as tags estruturais do HTML5:
-   header e nav em cima, main e aside lado a lado, footer embaixo. */
+/* Layout: header e nav em cima, main e aside lado a lado, footer embaixo */
 body {
   margin: 0 auto;
   max-width: 1200px;
@@ -148,8 +145,7 @@ form.linha {
   align-items: flex-end;
 }
 
-/* Cartão "Entrar no sistema" da página inicial: campos um embaixo do outro,
-   numa coluna estreita, com uma faixa colorida em cima. */
+/* Cartão "Entrar no sistema" da página inicial */
 section.cartao-entrar {
   border-top: 5px solid #0b6e8a;
 }
@@ -166,7 +162,6 @@ form.entrar select {
   padding: 10px;
 }
 
-/* Destaque ao clicar num campo */
 form.entrar input:focus,
 form.entrar select:focus {
   outline: none;

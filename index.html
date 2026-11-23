@@ -38,8 +38,7 @@
 
     <section class="cartao-entrar">
       <h2>Entrar no sistema</h2>
-      <!-- Mostrado para quem ainda não entrou. novalidate: os campos são
-           conferidos pelo inicio.js (mensagem amigável) e de novo pelo servidor. -->
+      <!-- novalidate: os campos são conferidos pelo inicio.js e pelo servidor -->
       <form id="formEntrar" class="entrar" novalidate hidden>
         <label>Perfil de acesso
           <select name="perfil" id="perfil" required>
@@ -60,7 +59,6 @@
         <p id="msgEntrar" class="mensagem" role="alert" hidden></p>
         <button type="submit" id="botaoEntrar">Entrar</button>
       </form>
-      <!-- Mostrado para quem já entrou -->
       <div id="jaEntrou" hidden>
         <p id="usuarioLogado"></p>
         <p><a id="linkMinhaArea" href="index.html">Abrir a minha área</a></p>
