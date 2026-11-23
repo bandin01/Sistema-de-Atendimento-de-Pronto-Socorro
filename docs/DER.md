@@ -183,13 +183,7 @@ erDiagram
     enum status_novo "NOT NULL"
     datetime data_hora "NOT NULL"
   }
-
-  sequencia_atendimento {
-    int_unsigned id PK "NOT NULL, AUTO_INCREMENT que gera o AT0001 (RNF03)"
-  }
 ```
-
-`sequencia_atendimento` não tem relacionamento: é uma tabela técnica. O trigger `trg_atendimentos_bi_numero` insere nela e usa `LAST_INSERT_ID()` para gerar o `numero_atendimento`.
 
 ## Chaves estrangeiras
 

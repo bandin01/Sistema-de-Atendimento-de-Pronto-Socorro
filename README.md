@@ -191,7 +191,7 @@ A coluna *Perfis* mostra quem pode usar cada rota (*pública* = não precisa de 
 
 | Regra | Onde |
 |---|---|
-| Número de atendimento único e sequencial, mesmo com cadastros simultâneos | trigger `trg_atendimentos_bi_numero` + tabela `sequencia_atendimento` |
+| Número de atendimento único e sequencial, mesmo com cadastros simultâneos | trigger `trg_atendimentos_bi_numero` |
 | Alterar/cancelar só antes da confirmação médica | `modulos/atendimentos.js` e trigger `trg_atendimentos_bu_bloqueio` |
 | Triagem só por enfermeiro(a) da categoria ENFERMEIRO | trigger `trg_triagens_bi_enfermeiro` |
 | Painel ordenado por Manchester no próprio banco | `ORDER BY FIELD(...)` em `modulos/medico.js` |

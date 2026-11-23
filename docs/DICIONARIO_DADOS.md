@@ -24,7 +24,6 @@ Todas as FKs são `ON UPDATE RESTRICT ON DELETE RESTRICT`.
 | `historico_status` | Rastreabilidade | todas | Mudanças de status do atendimento e quem as fez. |
 | `historico_etapas` | Rastreabilidade | todas | Descrição textual de cada etapa percorrida pelo paciente. |
 | `historico_status_medico` | Rastreabilidade | — | Mudanças de status operacional do médico. |
-| `sequencia_atendimento` | Técnica | — | Gera o número sequencial do `AT0001`. |
 
 ## Domínios (ENUM)
 
@@ -229,9 +228,3 @@ Esses valores são espelhados em `src/config/dominio.js` e `src/config/mancheste
 | data_hora | DATETIME | NÃO | | CURRENT_TIMESTAMP | |
 
 Preenchida só pelos triggers `trg_medicos_ai_status` e `trg_medicos_au_status`, tanto em mudanças feitas pela API quanto direto no banco.
-
-## Tabelas técnicas
-
-| Tabela | Coluna | Tipo | Nulo | Descrição |
-|---|---|---|---|---|
-| `sequencia_atendimento` | id | INT UNSIGNED, PK, AUTO_INCREMENT | NÃO | Um insert por atendimento; `LAST_INSERT_ID()` vira o número do `AT0001`. |
